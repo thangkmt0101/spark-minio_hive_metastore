@@ -1,0 +1,31 @@
+# MinIO Configuration
+MINIO_ENDPOINT=http://localhost:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET=csdlgt
+MINIO_SSL=false
+
+# Input Path
+INPUT_PATH=data/input
+
+# SQL Server 2025 Configuration
+# Khuyến nghị sử dụng ODBC Driver 18 hoặc 19 cho SQL Server 2025
+SQL_SERVER_HOST=localhost
+SQL_SERVER_PORT=1433
+SQL_SERVER_DATABASE=your_database
+SQL_SERVER_USER=your_username
+SQL_SERVER_PASSWORD=your_password
+SQL_SERVER_DRIVER=ODBC Driver 18 for SQL Server
+SQL_SERVER_TRUST_SERVER_CERTIFICATE=yes
+SQL_SERVER_ENCRYPT=yes
+
+# Legacy OUTPUT_DB config (optional, for backward compatibility)
+# OUTPUT_DB_URL=jdbc:sqlserver://localhost:1433;database=your_database
+# OUTPUT_DB_USER=your_username
+# OUTPUT_DB_PASSWORD=your_password
+
+# PostgreSQL Iceberg Catalog
+PG_CATALOG_URI=jdbc:postgresql://localhost:5432/postgres
+PG_CATALOG_USER=postgres
+PG_CATALOG_PASSWORD=postgres
+

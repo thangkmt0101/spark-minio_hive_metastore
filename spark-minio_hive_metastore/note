@@ -1,0 +1,1 @@
+spark-submit --packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.644,org.postgresql:postgresql:42.7.3,org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.5.0 jobs\read_iceberg_table.py
