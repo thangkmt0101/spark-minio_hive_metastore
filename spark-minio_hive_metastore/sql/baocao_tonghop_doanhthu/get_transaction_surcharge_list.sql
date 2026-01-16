@@ -13,7 +13,7 @@ A.VEHICLE_TYPE AS reconciled_vehicle_type,
 SUM(A.TOTAL_AMOUNT) AS reconciled_amount,
 NULL as surcharge_reason,
 NULL as amount_difference -- SUM(A.TOTAL_AMOUNT) - SUM(A.TOTAL_AMOUNT)
-FROM silver.silver.TRANSPORT_TRANSACTION_STAGE A
-INNER JOIN silver.silver.toll d on A.CHECKOUT_TOLL_ID = d.TOLL_ID -- LẤY THÔNG TIN TRẠM out
+FROM ice.gold.fact_transport_transaction_stage A
+INNER JOIN ice.gold.dim_toll d on A.CHECKOUT_TOLL_ID = d.TOLL_ID -- LẤY THÔNG TIN TRẠM out
 WHERE A.year  = '{{ year }}' AND A.month = '{{ month }}' AND A.day   = '{{ day }}'
 GROUP BY FE_TRANS_ID, CHECKOUT_DATETIME, CHECKOUT_COMMIT_DATETIME, PLATE, VEHICLE_TYPE, TOLL_NAME;

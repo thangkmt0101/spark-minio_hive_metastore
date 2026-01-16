@@ -8,6 +8,9 @@ MINIO_SSL=false
 # Input Path
 INPUT_PATH=data/input
 
+# MinIO ETL Data Export Path (source path cho sync từ MinIO)
+ETL_DATA_EXPORT_PATH=etl_data_export
+
 # SQL Server 2025 Configuration
 # Khuyến nghị sử dụng ODBC Driver 18 hoặc 19 cho SQL Server 2025
 SQL_SERVER_HOST=localhost

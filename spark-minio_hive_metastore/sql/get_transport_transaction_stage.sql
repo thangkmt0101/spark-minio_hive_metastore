@@ -1,2 +1,0 @@
-SELECT TRANSPORT_TRANS_ID, ETAG_ID, VEHICLE_ID, CHECKIN_TOLL_ID, CHECKIN_LANE_ID, 2025 as DATE_ID
-FROM gold.gold.fact_transport_transaction_stage

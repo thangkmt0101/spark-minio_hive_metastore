@@ -1,1 +1,17 @@
-spark-submit --packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.644,org.postgresql:postgresql:42.7.3,org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.5.0 jobs\read_iceberg_table.py
+
+ # Chạy job với job_type dùng cho airflow 
+docker compose exec spark-iceberg-etl /app/entrypoint.sh /app/jobs/main.py 1
+# Chạy job với job_type
+docker-compose exec spark-iceberg-etl /app/entrypoint.sh /app/jobs/main.py 1
+# Chạy với input_date
+docker-compose exec spark-iceberg-etl /app/entrypoint.sh /app/jobs/main.py <job_type> <input_date>
+
+. Rebuild image với SQL Server JDBC driver:
+docker-compose build spark-iceberg-etl
+Hoặc:
+docker build -t spark-iceberg-etl:latest .
+
+docker-compose stop spark-iceberg-etl
+docker-compose up -d spark-iceberg-etl
+
+

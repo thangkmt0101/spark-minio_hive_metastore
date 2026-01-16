@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS silver.silver.TRANSPORT_TRANSACTION_STAGE (
+CREATE TABLE IF NOT EXISTS ice.gold.fact_transport_transaction_stage (
     -- Business columns
     TRANSPORT_TRANS_ID        BIGINT,
     ETAG_ID                   BIGINT,
@@ -91,7 +91,7 @@ PARTITIONED BY (year, month, day, hour);
 
 
 
-CREATE TABLE IF NOT EXISTS silver.silver.etag (
+CREATE TABLE IF NOT EXISTS ice.gold.etag (
     ETAG_ID               DOUBLE NOT NULL,
     ETAG_TYPE             STRING NOT NULL,
     SERIAL                STRING NOT NULL,
@@ -112,7 +112,7 @@ PARTITIONED BY (year, month, day, hour);
 
 
 
-CREATE TABLE IF NOT EXISTS silver.silver.bot (
+CREATE TABLE IF NOT EXISTS ice.gold.bot (
     bot_id DOUBLE NOT NULL,
     bot_name STRING,
     bank_id DOUBLE,
@@ -136,7 +136,7 @@ PARTITIONED BY (
 )
 
 
-CREATE TABLE IF NOT EXISTS silver.silver.closed_cycle (
+CREATE TABLE IF NOT EXISTS ice.gold.dim_closed_cycle (
     cycle_id BIGINT NOT NULL,
     cycle_code STRING,
     cycle_name STRING,
@@ -161,7 +161,7 @@ PARTITIONED BY (
     hour
 )
 
-CREATE TABLE IF NOT EXISTS silver.silver.price (
+CREATE TABLE IF NOT EXISTS ice.gold.dim_price (
     price_id BIGINT,
     price_type STRING,
     vehicle_type STRING,
@@ -194,7 +194,7 @@ PARTITIONED BY (
     hour
 )
 
-CREATE TABLE IF NOT EXISTS silver.silver.toll (
+CREATE TABLE IF NOT EXISTS ice.gold.dim_toll (
     toll_id BIGINT NOT NULL,
     toll_name STRING,
     address STRING,
@@ -232,7 +232,7 @@ PARTITIONED BY (
     hour
 )
 
-CREATE TABLE IF NOT EXISTS silver.silver.toll_cycle (
+CREATE TABLE IF NOT EXISTS ice.gold.toll_cycle (
     toll_id BIGINT,
     cycle_id BIGINT,
     status STRING,
@@ -253,7 +253,7 @@ PARTITIONED BY (
     hour
 )
 
-CREATE TABLE IF NOT EXISTS silver.silver.toll_lane (
+CREATE TABLE IF NOT EXISTS ice.gold.dim_toll_lane (
     toll_id BIGINT,
     lane_code BIGINT,
     lane_type STRING,
@@ -284,7 +284,7 @@ PARTITIONED BY (
     hour
 )
 
-CREATE TABLE IF NOT EXISTS silver.silver.toll_stage (
+CREATE TABLE IF NOT EXISTS ice.gold.toll_stage (
     stage_id BIGINT NOT NULL,
     stage_code STRING,
     stage_name STRING,
@@ -315,7 +315,7 @@ PARTITIONED BY (
     hour
 )
 
-CREATE TABLE IF NOT EXISTS silver.silver.boo_transport_trans_stage (
+CREATE TABLE IF NOT EXISTS ice.gold.boo_transport_trans_stage (
     transport_trans_id      BIGINT,
     subscriber_id           BIGINT,
     etag_id                 BIGINT,
@@ -405,7 +405,7 @@ CREATE TABLE IF NOT EXISTS silver.silver.boo_transport_trans_stage (
 USING iceberg
 PARTITIONED BY (year, month, day, hour);
 
-CREATE TABLE IF NOT EXISTS silver.silver.transport_trans_stage_detail (
+CREATE TABLE IF NOT EXISTS ice.gold.transport_trans_stage_detail (
     transport_trans_id          BIGINT NOT NULL,
     stage_id                    BIGINT NOT NULL,
     price_id                    BIGINT,
@@ -427,7 +427,7 @@ USING iceberg
 PARTITIONED BY (year, month, day, hour);
 
 
-CREATE TABLE IF NOT EXISTS silver.silver.dim_date (
+CREATE TABLE IF NOT EXISTS ice.gold.dim_date (
     date_id              INT NOT NULL,
     date_name            DATE NOT NULL,
 

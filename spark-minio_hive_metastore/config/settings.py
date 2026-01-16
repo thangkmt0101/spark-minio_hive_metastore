@@ -1,7 +1,18 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env từ thư mục config (ưu tiên), nếu không có thì load từ root
+env_path_config = Path(__file__).parent / ".env"
+env_path_root = Path(__file__).parent.parent / ".env"
+
+if env_path_config.exists():
+    load_dotenv(env_path_config)
+elif env_path_root.exists():
+    load_dotenv(env_path_root)
+else:
+    # Fallback: load từ thư mục hiện tại hoặc thư mục gốc
+    load_dotenv()
 
 
 def _normalize_encrypt(value: str, default: str = "false") -> str:
@@ -27,36 +38,27 @@ MINIO_BUCKET = os.getenv("MINIO_BUCKET")
 MINIO_SSL = os.getenv("MINIO_SSL", "false")
 
 INPUT_PATH = os.getenv("INPUT_PATH")
-OUTPUT_PATH = os.getenv("OUTPUT_PATH", "output")
-
-# SQL Server Configuration
-# SQL Server 2025: Khuyến nghị sử dụng ODBC Driver 18 hoặc 19 cho SQL Server
-# Các driver hỗ trợ: "ODBC Driver 18 for SQL Server", "ODBC Driver 19 for SQL Server", "ODBC Driver 17 for SQL Server"
-# Lưu ý: ODBC Driver 18+ yêu cầu TrustServerCertificate=yes hoặc cấu hình SSL certificate
-SQL_SERVER_HOST = os.getenv("SQL_SERVER_HOST")
-SQL_SERVER_PORT = os.getenv("SQL_SERVER_PORT", "1433")
-SQL_SERVER_DATABASE = os.getenv("SQL_SERVER_DATABASE")
-SQL_SERVER_USER = os.getenv("SQL_SERVER_USER")
-SQL_SERVER_PASSWORD = os.getenv("SQL_SERVER_PASSWORD")
-SQL_SERVER_DRIVER = os.getenv("SQL_SERVER_DRIVER", "ODBC Driver 18 for SQL Server")
-# JDBC driver yêu cầu true/false/strict, không chấp nhận "yes"/"no"
-SQL_SERVER_TRUST_SERVER_CERTIFICATE = _normalize_encrypt(
-    os.getenv("SQL_SERVER_TRUST_SERVER_CERTIFICATE", "true"),
-    default="true"
-)
-SQL_SERVER_ENCRYPT = _normalize_encrypt(
-    os.getenv("SQL_SERVER_ENCRYPT", "false"),
-    default="false"
-)
+OUTPUT_PATH = os.getenv("OUTPUT_PATH")
+# MinIO ETL Data Export Path (source path cho sync từ MinIO)
+ETL_DATA_EXPORT_PATH = os.getenv("OUTPUT_PATH")
 
 PG_HIVE_METASTORE_URI = os.getenv("PG_HIVE_METASTORE_URI")
 # PostgreSQL Iceberg Catalog
 PG_CATALOG_URI = os.getenv("PG_CATALOG_URI")
 PG_CATALOG_USER = os.getenv("PG_CATALOG_USER")
 PG_CATALOG_PASSWORD = os.getenv("PG_CATALOG_PASSWORD")
+PG_HOST = os.getenv("PG_HOST") 
+PG_PORT = os.getenv("PG_PORT") 
+PG_DATABASE = os.getenv("PG_DATABASE")
+PG_USER = os.getenv("PG_USER")
+PG_PASSWORD = os.getenv("PG_PASSWORD")
 
 # Spark JDBC Write Configuration
 # Số dòng insert mỗi batch (tối ưu cho bulk insert)
 SPARK_JDBC_BATCH_SIZE = int(os.getenv("SPARK_JDBC_BATCH_SIZE", "100000"))
 # Số partition để parallel insert (tối ưu performance)
-SPARK_JDBC_NUM_PARTITIONS = int(os.getenv("SPARK_JDBC_NUM_PARTITIONS", "4"))
+# Có thể tăng lên để tận dụng nhiều connections song song (khuyến nghị: 4-8)
+# Với cleanup đúng cách, có thể sử dụng nhiều connections mà không bị leak
+SPARK_JDBC_NUM_PARTITIONS = int(os.getenv("SPARK_JDBC_NUM_PARTITIONS", "4"))  # Tăng lên 4 để tận dụng parallel insert
+# Tăng connection pool để handle nhiều jobs liên tục
+SPARK_JDBC_MAX_POOL_SIZE = int(os.getenv("SPARK_JDBC_MAX_POOL_SIZE", "32"))  # Tăng lên 20

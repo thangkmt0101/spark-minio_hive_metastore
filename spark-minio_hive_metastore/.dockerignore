@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Output và temp files
+output/
+*.log
+*.tmp
+_temp_*/
+
+# SQL files - không đóng gói vào image vì đã mount từ host
+sql/
+
+# Code folders - không đóng gói vào image vì đã mount từ host để dễ chỉnh sửa
+jobs/
+config/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+README_DOCKER.md
+
+# Documentation
+*.md
+FLOW.md
+note
+
+# Test files
+test_*.py
+*_test.py
+
+# OS
+.DS_Store
+Thumbs.db
+

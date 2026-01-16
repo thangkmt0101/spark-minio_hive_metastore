@@ -1,0 +1,13 @@
+# Danh sách các dim tables cần cache
+# Format: iceberg_table_path|temp_view_name
+# Mỗi dòng một dim table
+
+ice.gold.dim_toll_stage|dim_toll_stage
+ice.gold.dim_toll|dim_toll
+ice.gold.dim_vehicle|dim_vehicle
+ice.gold.dim_price|dim_price
+ice.gold.dim_toll_cycle|dim_toll_cycle
+ice.gold.dim_closed_cycle|dim_closed_cycle
+ice.gold.dim_toll_lane|dim_toll_lane
+ice.gold.view_dim_toll_stage_closed|view_dim_toll_stage_closed
+
