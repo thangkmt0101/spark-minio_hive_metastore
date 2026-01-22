@@ -1,5 +1,4 @@
 -- Tính doanh thu trên các giao dịch - Tổng hợp doanh thu theo tuyến
-
  
 
 SELECT 

@@ -5,7 +5,7 @@ docker compose exec spark-iceberg-etl /app/entrypoint.sh /app/jobs/main.py 1
 docker-compose exec spark-iceberg-etl /app/entrypoint.sh /app/jobs/main.py 1
 # Chạy với input_date
 docker-compose exec spark-iceberg-etl /app/entrypoint.sh /app/jobs/main.py <job_type> <input_date>
-
+docker-compose exec spark-iceberg-etl /app/entrypoint.sh /app/jobs/main.py --job_type 1 --from_date 2026-01-01 --to_date 2026-01-11
 . Rebuild image với SQL Server JDBC driver:
 docker-compose build spark-iceberg-etl
 Hoặc:

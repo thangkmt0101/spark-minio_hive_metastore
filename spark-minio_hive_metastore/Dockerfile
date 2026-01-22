@@ -46,10 +46,6 @@ RUN JARS_DIR="/opt/spark/jars" && \
     ls -lh *.jar | grep -E "(hadoop-aws|aws-java-sdk|postgresql|iceberg)" && \
     echo "Tổng số JAR files trong thư mục: $(ls -1 *.jar | wc -l)"
 
-# Copy entrypoint script
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
 # Copy script giữ container chạy (tên theo image)
 COPY spark-iceberg-etl.sh /app/spark-iceberg-etl.sh
 RUN chmod +x /app/spark-iceberg-etl.sh

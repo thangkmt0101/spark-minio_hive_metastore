@@ -167,58 +167,53 @@ class Etl_Runner:
             # Không throw exception để cleanup vẫn tiếp tục
             traceback.print_exc()
 
-    def run(self, job_type=None, input_date=None):
+    def run_for_date_list(self, job_type, date_list):
+        """
+        Chạy lần lượt các ngày trong danh sách (định dạng yyyy-mm-dd).
+        Sử dụng lại logic run() cho từng ngày để giữ nguyên hành vi hiện tại.
+        """
+        if not date_list:
+            raise ValueError("date_list khong duoc de trong")
+        
+        for idx, date_str in enumerate(date_list, 1):
+            print(f"\n[BATCH] ({idx}/{len(date_list)}) job_type={job_type}, input_date={date_str or 'default(hom qua)'}")
+            self.run(job_type=job_type, input_date=date_str)
+
+    def run(self, job_type=None, input_date=None, date_list=None):
         """
         Chạy job chính
         
         Args:
             job_type: Loại job để filter (optional). Nếu None thì lấy tất cả job active
             input_date: Ngay 'yyyy-mm-dd'; None -> mac dinh hom qua
+            date_list: Danh sách ngày dạng chuỗi yyyy-mm-dd; nếu truyền sẽ chạy tuần tự trong một Spark session
         """
 
         self.spark = SparkSessionBuilder.get_spark("Daily Revenue Job")
 
-        info = TimeService.get_target_date(input_date)
-        y_year = info["year"]
-        y_quarter = info["quarter"]
-        y_month = info["month"]
-        y_day = info["day"]
+        dates_to_process = date_list if date_list else [input_date]
+        if not dates_to_process:
+            # Không truyền gì sẽ để TimeService tự lấy mặc định (hôm qua)
+            dates_to_process = [None]
 
-        # Xác định mức thời gian dựa trên job_type
+        # Xác định mức thời gian dựa trên job_type (dùng chung cho mọi ngày)
         # job_type = 1 -> Daily, 2 -> Week, 3 -> Month, 4 -> Quarter, 5 -> Year
         job_type_int = int(job_type) if isinstance(job_type, (int, str)) and str(job_type).isdigit() else None
-        
         if job_type_int == 1:
-            # Daily: lấy thông tin UTC range từ ngày VN (UTC+7)
             time_level = 'day'
-            utc_info = TimeService.get_utc_range_from_vn_date(info["date_str"])
         elif job_type_int == 2:
-            # Week: lấy thông tin UTC range cho cả tuần (thứ 2 đến chủ nhật)
             time_level = 'week'
-            utc_info = TimeService.get_utc_range_from_vn_week(info["date_str"])
         elif job_type_int == 3:
-            # Month: lấy thông tin UTC range cho cả tháng (UTC+7)
             time_level = 'month'
-            utc_info = TimeService.get_utc_range_from_vn_month(info["date_str"])
         elif job_type_int == 4:
-            # Quarter: lấy thông tin UTC range cho cả quý (UTC+7)
             time_level = 'quarter'
-            utc_info = TimeService.get_utc_range_from_vn_quarter(info["date_str"])
         elif job_type_int == 5:
-            # Year: lấy thông tin UTC range cho cả năm (UTC+7)
             time_level = 'year'
-            utc_info = TimeService.get_utc_range_from_vn_year(info["date_str"])
         else:
-            # Mặc định: Daily nếu không xác định được
-            print(f"[WARNING] job_type='{job_type}' khong hop le")
+            time_level = 'day'
+            print(f"[WARNING] job_type='{job_type}' khong hop le, mac dinh time_level='day'")
         
         print(f"[INFO] Mức thời gian: {time_level} (job_type={job_type})")
-        
-        utc_year = utc_info["day_ranges"]
-        utc_quarter = utc_info["day_ranges"]
-        utc_month = utc_info["day_ranges"]
-        utc_week = utc_info["day_ranges"]
-        utc_day_ranges = utc_info["day_ranges"]
 
         try: 
             # 0. Kết nối database PostgreSQL và đọc bảng etl_job để lấy table_name và sql_path
@@ -261,340 +256,369 @@ class Etl_Runner:
             
             # Cache các dim tables trước khi xử lý jobs
             self._cache_dim_tables()
-             
-            # Duyệt qua từng job và xử lý
-            for job_idx, etl_job_result in enumerate(etl_job_results, 1):
-                # Bắt đầu tính thời gian execution cho job con này
-                single_job_start_time = time.time()
+            
+            # Duyệt qua từng ngày rồi mới duyệt từng job để tái sử dụng cùng Spark session
+            for date_idx, current_date in enumerate(dates_to_process, 1):
+                info = TimeService.get_target_date(current_date)
+                y_year = info["year"]
+                y_quarter = info["quarter"]
+                y_month = info["month"]
+                y_day = info["day"]
+                print(f"\n[DATE] ({date_idx}/{len(dates_to_process)}) Dang xu ly ngay {info['date_str']} cho job_type={job_type}")
+
+                # Lấy UTC range theo job_type và ngày hiện tại
+                if job_type_int == 1:
+                    utc_info = TimeService.get_utc_range_from_vn_date(info["date_str"])
+                elif job_type_int == 2:
+                    utc_info = TimeService.get_utc_range_from_vn_week(info["date_str"])
+                elif job_type_int == 3:
+                    utc_info = TimeService.get_utc_range_from_vn_month(info["date_str"])
+                elif job_type_int == 4:
+                    utc_info = TimeService.get_utc_range_from_vn_quarter(info["date_str"])
+                elif job_type_int == 5:
+                    utc_info = TimeService.get_utc_range_from_vn_year(info["date_str"])
+                else:
+                    utc_info = TimeService.get_utc_range_from_vn_date(info["date_str"])
                 
-                try:
-                    print(f"\n[{job_idx}/{len(etl_job_results)}] Dang xu ly job... {etl_job_result}")
-                    
-                    # Lấy các giá trị từ etl_job_result
-                    table_name = etl_job_result[0]
-                    sql_path = etl_job_result[1]
-                    delete_column = etl_job_result[2]
-                    delete_condition = etl_job_result[3]  # Lấy delete_condition từ bảng etl_job
-                    
-                    # Đọc file SQL từ sql_path
-                    if not os.path.exists(sql_path):
-                        error_msg = f"Khong tim thay file SQL: {sql_path}"
-                        try:
-                            JobLogger.log_error(
-                                job_name=f"Etl_Runner --> File Not Found for {table_name}",
-                                job_type=job_type,
-                                message=error_msg,
-                                conn_str=self.conn_str,
-                                error_traceback=traceback.format_exc(),
-                                error_level="ERROR",
-                                table_name=table_name,
-                                sql_path=sql_path,
-                                operation_type="READ_SQL_FILE",
-                                year=y_year,
-                                month=y_month,
-                                day=y_day
-                            )
-                        except Exception as log_err:
-                            print(f"[WARNING] Khong the ghi log file not found error: {log_err}")
-                        raise FileNotFoundError(error_msg)
+                utc_year = utc_info["day_ranges"]
+                utc_quarter = utc_info["day_ranges"]
+                utc_month = utc_info["day_ranges"]
+                utc_week = utc_info["day_ranges"]
+                utc_day_ranges = utc_info["day_ranges"]
+
+                # Duyệt qua từng job và xử lý
+                for job_idx, etl_job_result in enumerate(etl_job_results, 1):
+                    # Bắt đầu tính thời gian execution cho job con này
+                    single_job_start_time = time.time()
                     
                     try:
-                        with open(sql_path, 'r', encoding='utf-8') as f:
-                            sql_template = f.read()
-                    except Exception as read_err:
-                        error_msg = f"Loi khi doc file SQL {sql_path}: {str(read_err)}"
-                        print(f"[ERROR] {error_msg}")
-                        try:
-                            JobLogger.log_error(
-                                job_name=f"Etl_Runner --> Read SQL File Error for {table_name}",
-                                job_type=job_type,
-                                message=error_msg,
-                                conn_str=self.conn_str,
-                                error_traceback=traceback.format_exc(),
-                                error_level="ERROR",
-                                table_name=table_name,
-                                sql_path=sql_path,
-                                operation_type="READ_SQL_FILE",
-                                year=y_year,
-                                month=y_month,
-                                day=y_day
-                            )
-                        except Exception as log_err:
-                            print(f"[WARNING] Khong the ghi log read SQL file error: {log_err}")
-                        raise Exception(error_msg) from read_err
-                    
-                    # Render template với các biến UTC year, month, day và day_ranges
-                    try:
-                        template = Template(sql_template)
-                        sql_query = template.render(
-                            year_utc_7=str(y_year),
-                            quarter_utc_7=str(y_quarter),
-                            month_utc_7=str(y_month).zfill(2),
-                            week_utc_7=str(utc_week),
-                            day_utc_7=str(y_day).zfill(2),
-
-                            year=utc_year,
-                            quarter=utc_quarter,
-                            month=utc_month, #kết quả định dạng: "01"
-                            week=utc_week,
-                            day_ranges=utc_day_ranges # Truyền day_ranges để template có thể loop qua
-                        )
-
-                    except Exception as render_err:
-                        error_msg = f"Loi khi render template SQL cho bang {table_name}: {str(render_err)}"
-                        print(f"[ERROR] {error_msg}")
-                        try:
-                            JobLogger.log_error(
-                                job_name=f"Etl_Runner --> Render Template Error for {table_name}",
-                                job_type=job_type,
-                                message=error_msg,
-                                conn_str=self.conn_str,
-                                error_traceback=traceback.format_exc(),
-                                error_level="ERROR",
-                                table_name=table_name,
-                                sql_path=sql_path,
-                                operation_type="RENDER_TEMPLATE",
-                                year=y_year,
-                                month=y_month,
-                                day=y_day
-                            )
-                        except Exception as log_err:
-                            print(f"[WARNING] Khong the ghi log render template error: {log_err}")
-                        raise Exception(error_msg) from render_err      
-                    #Chạy SQL query bằng spark.sql()
-                    try:
-                        df = self.spark.sql(sql_query)
-                    except Exception as sql_err:
-                        error_msg = f"Loi khi chay SQL query cho bang {table_name}: {str(sql_err)}"
-                        print(f"[ERROR] {error_msg}")
-                        try:
-                            JobLogger.log_error(
-                                job_name=f"Etl_Runner --> Execute SQL Error for {table_name}",
-                                job_type=job_type,
-                                message=error_msg,
-                                conn_str=self.conn_str,
-                                error_traceback=traceback.format_exc(),
-                                error_level="ERROR",
-                                table_name=table_name,
-                                sql_path=sql_path,
-                                operation_type="EXECUTE_SQL",
-                                year=y_year,
-                                month=y_month,
-                                day=y_day
-                            )
-                        except Exception as log_err:
-                            print(f"[WARNING] Khong the ghi log execute SQL error: {log_err}")
-                        raise Exception(error_msg) from sql_err
-
-                    try:
-                        # Chỉ scan 1 record, không full scan để kiểm tra có dữ liệu không
-                        # Nếu executor crash, count() sẽ throw SparkException hoặc Py4JJavaError
-                        has_data = df.limit(1).count() > 0
-                    except Exception as check_error:
-                        error_msg = f"SQL/Iceberg/S3/Executor loi khi kiem tra du lieu cho bang {table_name}: {str(check_error)}"
-                        print(f"[ERROR] {error_msg}")
-                        try:
-                            JobLogger.log_error(
-                                job_name=f"Etl_Runner --> Check Data Error for {table_name}",
-                                job_type=job_type,
-                                message=error_msg,
-                                conn_str=self.conn_str,
-                                error_traceback=traceback.format_exc(),
-                                error_level="ERROR",
-                                table_name=table_name,
-                                sql_path=sql_path,
-                                operation_type="CHECK_DATA",
-                                year=y_year,
-                                month=y_month,
-                                day=y_day
-                            )
-                        except Exception as log_err:
-                            print(f"[WARNING] Khong the ghi log check data error: {log_err}")
-                        raise Exception(error_msg) from check_error
-                    
-                    if not has_data:
-                        print(f"[SKIP INSERT] {table_name} không có dữ liệu")
-                        continue
-
-                    csv_temp_dir = None
-                    try:
-                        # Tạo thư mục temp để lưu CSV
-                        csv_temp_dir = os.path.join(OUTPUT_PATH, f"{table_name}")
-                        os.makedirs(csv_temp_dir, exist_ok=True)
-
-                        # Export DataFrame sang CSV
-                        csv_file_path = EtlUtils.export_dataframe_to_csv(
-                            df=df,
-                            output_dir=csv_temp_dir,
-                            delimiter=',',
-                            datetime_csv=(y_year+y_month+y_day)
-                        )
+                        print(f"\n[{job_idx}/{len(etl_job_results)}] Dang xu ly job... {etl_job_result}")
                         
-                        # Export DataFrame sang Parquet (Iceberg table) - chỉ export nếu có đủ cột partition
-                        try:
-                            # Kiểm tra DataFrame có các cột partition không
-                            df_columns = [col_name.lower() for col_name in df.columns]
-                            print(df_columns)
-                            required_partition_cols = ["year", "month", "day"]
-                            has_partition_cols = all(col in df_columns for col in required_partition_cols)
-                            
-                            if has_partition_cols:
-                                # Tạo table name: mart.{table_name}
-                                mart_table_name = f"mart.{table_name}"
-                                print(f"[EXPORT PARQUET] Bắt đầu export sang Iceberg table: {mart_table_name}")
-                                EtlUtils.export_dataframe_to_parquet(
-                                    df=df,
-                                    table_name=mart_table_name
+                        # Lấy các giá trị từ etl_job_result
+                        table_name = etl_job_result[0]
+                        sql_path = etl_job_result[1]
+                        delete_column = etl_job_result[2]
+                        delete_condition = etl_job_result[3]  # Lấy delete_condition từ bảng etl_job
+                        
+                        # Đọc file SQL từ sql_path
+                        if not os.path.exists(sql_path):
+                            error_msg = f"Khong tim thay file SQL: {sql_path}"
+                            try:
+                                JobLogger.log_error(
+                                    job_name=f"Etl_Runner --> File Not Found for {table_name}",
+                                    job_type=job_type,
+                                    message=error_msg,
+                                    conn_str=self.conn_str,
+                                    error_traceback=traceback.format_exc(),
+                                    error_level="ERROR",
+                                    table_name=table_name,
+                                    sql_path=sql_path,
+                                    operation_type="READ_SQL_FILE",
+                                    year=y_year,
+                                    month=y_month,
+                                    day=y_day
                                 )
-                                print(f"[EXPORT PARQUET] Export thành công vào {mart_table_name}")
-                            else:
-                                print(f"[SKIP PARQUET] Bỏ qua export Parquet vì thiếu cột partition (cần: year, month, day)")
-                        except Exception as parquet_error:
-                            # Không để lỗi Parquet ảnh hưởng đến CSV export
-                            error_msg = f"Lỗi khi export Parquet cho bảng {table_name}: {str(parquet_error)}"
-                            print(f"[WARNING] {error_msg}")
-                            # Không log vào DB để tránh spam
+                            except Exception as log_err:
+                                print(f"[WARNING] Khong the ghi log file not found error: {log_err}")
+                            raise FileNotFoundError(error_msg)
+                        
+                        try:
+                            with open(sql_path, 'r', encoding='utf-8') as f:
+                                sql_template = f.read()
+                        except Exception as read_err:
+                            error_msg = f"Loi khi doc file SQL {sql_path}: {str(read_err)}"
+                            print(f"[ERROR] {error_msg}")
+                            try:
+                                JobLogger.log_error(
+                                    job_name=f"Etl_Runner --> Read SQL File Error for {table_name}",
+                                    job_type=job_type,
+                                    message=error_msg,
+                                    conn_str=self.conn_str,
+                                    error_traceback=traceback.format_exc(),
+                                    error_level="ERROR",
+                                    table_name=table_name,
+                                    sql_path=sql_path,
+                                    operation_type="READ_SQL_FILE",
+                                    year=y_year,
+                                    month=y_month,
+                                    day=y_day
+                                )
+                            except Exception as log_err:
+                                print(f"[WARNING] Khong the ghi log read SQL file error: {log_err}")
+                            raise Exception(error_msg) from read_err
+                        
+                        # Render template với các biến UTC year, month, day và day_ranges
+                        try:
+                            template = Template(sql_template)
+                            sql_query = template.render(
+                                year_utc_7=str(y_year),
+                                quarter_utc_7=str(y_quarter),
+                                month_utc_7=str(y_month).zfill(2),
+                                week_utc_7=str(utc_week),
+                                day_utc_7=str(y_day).zfill(2),
+
+                                year=utc_year,
+                                quarter=utc_quarter,
+                                month=utc_month, #kết quả định dạng: "01"
+                                week=utc_week,
+                                day_ranges=utc_day_ranges # Truyền day_ranges để template có thể loop qua
+                            )
+
+                        except Exception as render_err:
+                            error_msg = f"Loi khi render template SQL cho bang {table_name}: {str(render_err)}"
+                            print(f"[ERROR] {error_msg}")
+                            try:
+                                JobLogger.log_error(
+                                    job_name=f"Etl_Runner --> Render Template Error for {table_name}",
+                                    job_type=job_type,
+                                    message=error_msg,
+                                    conn_str=self.conn_str,
+                                    error_traceback=traceback.format_exc(),
+                                    error_level="ERROR",
+                                    table_name=table_name,
+                                    sql_path=sql_path,
+                                    operation_type="RENDER_TEMPLATE",
+                                    year=y_year,
+                                    month=y_month,
+                                    day=y_day
+                                )
+                            except Exception as log_err:
+                                print(f"[WARNING] Khong the ghi log render template error: {log_err}")
+                            raise Exception(error_msg) from render_err      
+                        #Chạy SQL query bằng spark.sql()
+                        try:
+                            df = self.spark.sql(sql_query)
+                        except Exception as sql_err:
+                            error_msg = f"Loi khi chay SQL query cho bang {table_name}: {str(sql_err)}"
+                            print(f"[ERROR] {error_msg}")
+                            try:
+                                JobLogger.log_error(
+                                    job_name=f"Etl_Runner --> Execute SQL Error for {table_name}",
+                                    job_type=job_type,
+                                    message=error_msg,
+                                    conn_str=self.conn_str,
+                                    error_traceback=traceback.format_exc(),
+                                    error_level="ERROR",
+                                    table_name=table_name,
+                                    sql_path=sql_path,
+                                    operation_type="EXECUTE_SQL",
+                                    year=y_year,
+                                    month=y_month,
+                                    day=y_day
+                                )
+                            except Exception as log_err:
+                                print(f"[WARNING] Khong the ghi log execute SQL error: {log_err}")
+                            raise Exception(error_msg) from sql_err
+
+                        try:
+                            # Chỉ scan 1 record, không full scan để kiểm tra có dữ liệu không
+                            # Nếu executor crash, count() sẽ throw SparkException hoặc Py4JJavaError
+                            has_data = df.limit(1).count() > 0
+                        except Exception as check_error:
+                            error_msg = f"SQL/Iceberg/S3/Executor loi khi kiem tra du lieu cho bang {table_name}: {str(check_error)}"
+                            print(f"[ERROR] {error_msg}")
+                            try:
+                                JobLogger.log_error(
+                                    job_name=f"Etl_Runner --> Check Data Error for {table_name}",
+                                    job_type=job_type,
+                                    message=error_msg,
+                                    conn_str=self.conn_str,
+                                    error_traceback=traceback.format_exc(),
+                                    error_level="ERROR",
+                                    table_name=table_name,
+                                    sql_path=sql_path,
+                                    operation_type="CHECK_DATA",
+                                    year=y_year,
+                                    month=y_month,
+                                    day=y_day
+                                )
+                            except Exception as log_err:
+                                print(f"[WARNING] Khong the ghi log check data error: {log_err}")
+                            raise Exception(error_msg) from check_error
+                        
+                        if not has_data:
+                            print(f"[SKIP INSERT] {table_name} không có dữ liệu")
+                            continue
+
+                        csv_temp_dir = None
+                        try:
+                            # Tạo thư mục temp để lưu CSV
+                            csv_temp_dir = os.path.join(OUTPUT_PATH, f"{table_name}")
+                            os.makedirs(csv_temp_dir, exist_ok=True)
+
+                            # Export DataFrame sang CSV
+                            csv_file_path = EtlUtils.export_dataframe_to_csv(
+                                df=df,
+                                output_dir=csv_temp_dir,
+                                delimiter=',',
+                                datetime_csv=(y_year+y_month+y_day)
+                            )
                             
-                    except Exception as bulk_error:
-                        error_msg = f"Loi khi export CSV cho bang {table_name}: {str(bulk_error)}"
-                        print(f"[ERROR] {error_msg}")
+                            # Export DataFrame sang Parquet (Iceberg table) - chỉ export nếu có đủ cột partition
+                            try:
+                                # Kiểm tra DataFrame có các cột partition không
+                                df_columns = [col_name.lower() for col_name in df.columns]
+                                print(df_columns)
+                                required_partition_cols = ["year", "month", "day"]
+                                has_partition_cols = all(col in df_columns for col in required_partition_cols)
+                                
+                                if has_partition_cols:
+                                    # Tạo table name: mart.{table_name}
+                                    mart_table_name = f"mart.{table_name}"
+                                    print(f"[EXPORT PARQUET] Bắt đầu export sang Iceberg table: {mart_table_name}")
+                                    EtlUtils.export_dataframe_to_parquet(
+                                        df=df,
+                                        table_name=mart_table_name
+                                    )
+                                    print(f"[EXPORT PARQUET] Export thành công vào {mart_table_name}")
+                                else:
+                                    print(f"[SKIP PARQUET] Bỏ qua export Parquet vì thiếu cột partition (cần: year, month, day)")
+                            except Exception as parquet_error:
+                                # Không để lỗi Parquet ảnh hưởng đến CSV export
+                                error_msg = f"Lỗi khi export Parquet cho bảng {table_name}: {str(parquet_error)}"
+                                print(f"[WARNING] {error_msg}")
+                                # Không log vào DB để tránh spam
+                                
+                        except Exception as bulk_error:
+                            error_msg = f"Loi khi export CSV cho bang {table_name}: {str(bulk_error)}"
+                            print(f"[ERROR] {error_msg}")
+                            try:
+                                JobLogger.log_error(
+                                    job_name=f"Etl_Runner --> Export CSV Error for {table_name}",
+                                    job_type=job_type,
+                                    message=error_msg,
+                                    conn_str=self.conn_str,
+                                    error_traceback=traceback.format_exc(),
+                                    error_level="ERROR",
+                                    table_name=table_name,
+                                    sql_path=sql_path,
+                                    operation_type="EXPORT_CSV",
+                                    year=y_year,
+                                    month=y_month,
+                                    day=y_day
+                                )
+                            except Exception as log_err:
+                                print(f"[WARNING] Khong the ghi log export CSV error: {log_err}")
+                            raise Exception(error_msg) from bulk_error
+                        
+                        # Cleanup: Unpersist DataFrame và clear cache để giải phóng memory (cho cả trường hợp rỗng)
+                        try:
+                            df.unpersist(blocking=False)  # Non-blocking để tránh treo
+                        except Exception as unpersist_err:
+                            # Chỉ in warning, không log vào DB (không quan trọng)
+                            print(f"[WARNING] Loi khi unpersist DataFrame cho bang {table_name}: {str(unpersist_err)}")
+                        
+                        # TỐI ƯU: Cleanup broadcast variables và Spark catalog cache để giải phóng memory
+                        try:
+                            self.spark.catalog.clearCache()  # Clear cache và broadcast variables
+                        except Exception as cache_error:
+                            # Chỉ in warning, không log vào DB (không quan trọng)
+                            print(f"[WARNING] Khong the clear cache cho bang {table_name}: {str(cache_error)}")
+                        
+                        # Tính toán thời gian execution cho job con này (từ đầu đến khi insert xong)
+                        single_job_elapsed_time = time.time() - single_job_start_time
+                        execution_time_ms = round(single_job_elapsed_time / 60, 2)  # Chuyển sang phút (giữ 2 chữ số thập phân)
+                        
+                        print(f"[INFO] Thoi gian thuc thi job con: {execution_time_ms} phut ({single_job_elapsed_time:.2f}s)")
+                        
+                        # Ghi log thong tin so ban ghi da insert với thời gian execution (tạo connection riêng và đóng sau khi insert log)
+                        # Thêm try-except để tránh treo job nếu log fail
+                        try:
+                            JobLogger.log_info(
+                                job_name="Etl_Runner --> Success insert",
+                                info_message=f"Insert thanh vao {table_name}",
+                                conn_str=self.conn_str,  # Hàm sẽ tạo connection riêng
+                                table_name=table_name,
+                                sql_path=sql_path,
+                                operation_type="INSERT",
+                                year=y_year,
+                                month=y_month,
+                                day=y_day,
+                                execution_time_ms=execution_time_ms,  # Thời gian execution khi insert thành công
+                                job_type=job_type
+                            )
+                        except Exception as log_err:
+                            # Nếu log fail, không để job bị treo, chỉ in warning
+                            print(f"[WARNING] Khong the ghi log execution_time_ms vao database: {log_err}")
+                        
+                        # Gộp và đổi tên file trên MinIO trước khi sync
+                        try:
+                            print(f"\n[MERGE] Đang gộp và đổi tên file trên MinIO cho table: {table_name}")
+                            EtlUtils.merge_and_rename_files_in_minio(
+                                source_path=ETL_DATA_EXPORT_PATH,
+                                table_name=table_name,
+                                input_date=current_date
+                            )
+                        except Exception as merge_err:
+                            # Chỉ in warning, không log vào DB (không ảnh hưởng đến dữ liệu đã insert)
+                            print(f"[WARNING] Loi khi gop va doi ten file cho table {table_name}: {str(merge_err)}")
+                        
+                        # Sync từ MinIO sau khi insert thành công cho table này
+                        try:
+                            print(f"\n[SYNC] Đang sync dữ liệu từ MinIO cho table: {table_name}")
+                            EtlUtils.sync_from_minio(
+                                source_path=ETL_DATA_EXPORT_PATH, 
+                                dest_path="/data/etl_data_export", 
+                                input_date=current_date,
+                                table_name=table_name
+                            )
+                        except Exception as sync_err:
+                            # Chỉ in warning, không log vào DB (không ảnh hưởng đến dữ liệu đã insert)
+                            print(f"[WARNING] Loi khi sync tu MinIO cho table {table_name}: {str(sync_err)}")
+                        
+                        # Xóa dữ liệu cũ từ MinIO (3 ngày trước)
+                        try:
+                            print(f"\n[DELETE] Đang xóa dữ liệu cũ từ MinIO cho table: {table_name}")
+                            EtlUtils.delete_old_data_from_minio(
+                                source_path=ETL_DATA_EXPORT_PATH,
+                                table_name=table_name,
+                                input_date=current_date,
+                                days_before=3
+                            )
+                        except Exception as delete_err:
+                            # Chỉ in warning, không log vào DB (không quan trọng)
+                            print(f"[WARNING] Loi khi xoa du lieu cu cho table {table_name}: {str(delete_err)}")
+    
+                    except Exception as e:
+                        error_msg = f"Loi khi xu ly job cho bang {table_name}: {str(e)}"
+                        
+                        # Ghi log lỗi vào database, bổ sung số bản ghi đã đếm (nếu có) (tạo connection riêng và đóng sau khi insert log)
                         try:
                             JobLogger.log_error(
-                                job_name=f"Etl_Runner --> Export CSV Error for {table_name}",
+                                job_name=f"Etl_Runner --> Error for job {job_idx}/{len(etl_job_results)}",
                                 job_type=job_type,
                                 message=error_msg,
-                                conn_str=self.conn_str,
+                                conn_str=self.conn_str,  # Hàm sẽ tạo connection riêng
                                 error_traceback=traceback.format_exc(),
                                 error_level="ERROR",
                                 table_name=table_name,
                                 sql_path=sql_path,
-                                operation_type="EXPORT_CSV",
+                                operation_type="JOB_EXECUTION",
                                 year=y_year,
                                 month=y_month,
                                 day=y_day
                             )
                         except Exception as log_err:
-                            print(f"[WARNING] Khong the ghi log export CSV error: {log_err}")
-                        raise Exception(error_msg) from bulk_error
-                    
-                    # Cleanup: Unpersist DataFrame và clear cache để giải phóng memory (cho cả trường hợp rỗng)
-                    try:
-                        df.unpersist(blocking=False)  # Non-blocking để tránh treo
-                    except Exception as unpersist_err:
-                        # Chỉ in warning, không log vào DB (không quan trọng)
-                        print(f"[WARNING] Loi khi unpersist DataFrame cho bang {table_name}: {str(unpersist_err)}")
-                    
-                    # TỐI ƯU: Cleanup broadcast variables và Spark catalog cache để giải phóng memory
-                    try:
-                        self.spark.catalog.clearCache()  # Clear cache và broadcast variables
-                    except Exception as cache_error:
-                        # Chỉ in warning, không log vào DB (không quan trọng)
-                        print(f"[WARNING] Khong the clear cache cho bang {table_name}: {str(cache_error)}")
-                    
-                    # Tính toán thời gian execution cho job con này (từ đầu đến khi insert xong)
-                    single_job_elapsed_time = time.time() - single_job_start_time
-                    execution_time_ms = round(single_job_elapsed_time / 60, 2)  # Chuyển sang phút (giữ 2 chữ số thập phân)
-                    
-                    print(f"[INFO] Thoi gian thuc thi job con: {execution_time_ms} phut ({single_job_elapsed_time:.2f}s)")
-                    
-                    # Ghi log thong tin so ban ghi da insert với thời gian execution (tạo connection riêng và đóng sau khi insert log)
-                    # Thêm try-except để tránh treo job nếu log fail
-                    try:
-                        JobLogger.log_info(
-                            job_name="Etl_Runner --> Success insert",
-                            info_message=f"Insert thanh vao {table_name}",
-                            conn_str=self.conn_str,  # Hàm sẽ tạo connection riêng
-                            table_name=table_name,
-                            sql_path=sql_path,
-                            operation_type="INSERT",
-                            year=y_year,
-                            month=y_month,
-                            day=y_day,
-                            execution_time_ms=execution_time_ms,  # Thời gian execution khi insert thành công
-                            job_type=job_type
-                        )
-                    except Exception as log_err:
-                        # Nếu log fail, không để job bị treo, chỉ in warning
-                        print(f"[WARNING] Khong the ghi log execution_time_ms vao database: {log_err}")
-                    
-                    # Gộp và đổi tên file trên MinIO trước khi sync
-                    try:
-                        print(f"\n[MERGE] Đang gộp và đổi tên file trên MinIO cho table: {table_name}")
-                        EtlUtils.merge_and_rename_files_in_minio(
-                            source_path=ETL_DATA_EXPORT_PATH,
-                            table_name=table_name,
-                            input_date=input_date
-                        )
-                    except Exception as merge_err:
-                        # Chỉ in warning, không log vào DB (không ảnh hưởng đến dữ liệu đã insert)
-                        print(f"[WARNING] Loi khi gop va doi ten file cho table {table_name}: {str(merge_err)}")
-                    
-                    # Sync từ MinIO sau khi insert thành công cho table này
-                    try:
-                        print(f"\n[SYNC] Đang sync dữ liệu từ MinIO cho table: {table_name}")
-                        EtlUtils.sync_from_minio(
-                            source_path=ETL_DATA_EXPORT_PATH, 
-                            dest_path="/data/etl_data_export", 
-                            input_date=input_date,
-                            table_name=table_name
-                        )
-                    except Exception as sync_err:
-                        # Chỉ in warning, không log vào DB (không ảnh hưởng đến dữ liệu đã insert)
-                        print(f"[WARNING] Loi khi sync tu MinIO cho table {table_name}: {str(sync_err)}")
-                    
-                    # Xóa dữ liệu cũ từ MinIO (3 ngày trước)
-                    try:
-                        print(f"\n[DELETE] Đang xóa dữ liệu cũ từ MinIO cho table: {table_name}")
-                        EtlUtils.delete_old_data_from_minio(
-                            source_path=ETL_DATA_EXPORT_PATH,
-                            table_name=table_name,
-                            input_date=input_date,
-                            days_before=3
-                        )
-                    except Exception as delete_err:
-                        # Chỉ in warning, không log vào DB (không quan trọng)
-                        print(f"[WARNING] Loi khi xoa du lieu cu cho table {table_name}: {str(delete_err)}")
- 
-                except Exception as e:
-                    error_msg = f"Loi khi xu ly job cho bang {table_name}: {str(e)}"
-                    
-                    # Ghi log lỗi vào database, bổ sung số bản ghi đã đếm (nếu có) (tạo connection riêng và đóng sau khi insert log)
-                    try:
-                        JobLogger.log_error(
-                            job_name=f"Etl_Runner --> Error for job {job_idx}/{len(etl_job_results)}",
-                            job_type=job_type,
-                            message=error_msg,
-                            conn_str=self.conn_str,  # Hàm sẽ tạo connection riêng
-                            error_traceback=traceback.format_exc(),
-                            error_level="ERROR",
-                            table_name=table_name,
-                            sql_path=sql_path,
-                            operation_type="JOB_EXECUTION",
-                            year=y_year,
-                            month=y_month,
-                            day=y_day
-                        )
-                    except Exception as log_err:
-                        print(f"[WARNING] Khong the ghi log job execution error: {log_err}")
-                    
-                    # QUAN TRỌNG: Kiểm tra xem có phải lỗi executor crash không
-                    # Nếu là lỗi executor crash hoặc lỗi nghiêm trọng → DỪNG job ngay
-                    error_str = str(e).lower()
-                    is_executor_crash = any(keyword in error_str for keyword in [
-                        "executor", "command exited", "sparkexception", 
-                        "py4jjavaerror", "executor crash", "task failed"
-                    ])
-                    
-                    if is_executor_crash:
-                        # Lỗi executor crash → DỪNG job ngay, không tiếp tục
-                        print(f"[FATAL ERROR] Executor crash detected! Dừng job ngay lập tức.")
-                        print(f"[FATAL ERROR] Lỗi: {error_msg}")
-                        raise Exception(f"[FATAL] Executor crash khi xử lý bảng {table_name}. Job đã dừng.") from e
-                    else:
-                        # Lỗi khác (SQL, Iceberg, S3) → có thể tiếp tục hoặc dừng tùy vào yêu cầu
-                        # Hiện tại: tiếp tục chạy các bảng khác, chỉ log lỗi
-                        print(f"[ERROR] Lỗi khi xử lý bảng {table_name}, tiếp tục với các bảng khác...")
-                        # Không raise exception để job tiếp tục chạy các bảng khác
+                            print(f"[WARNING] Khong the ghi log job execution error: {log_err}")
+                        
+                        # QUAN TRỌNG: Kiểm tra xem có phải lỗi executor crash không
+                        # Nếu là lỗi executor crash hoặc lỗi nghiêm trọng → DỪNG job ngay
+                        error_str = str(e).lower()
+                        is_executor_crash = any(keyword in error_str for keyword in [
+                            "executor", "command exited", "sparkexception", 
+                            "py4jjavaerror", "executor crash", "task failed"
+                        ])
+                        
+                        if is_executor_crash:
+                            # Lỗi executor crash → DỪNG job ngay, không tiếp tục
+                            print(f"[FATAL ERROR] Executor crash detected! Dừng job ngay lập tức.")
+                            print(f"[FATAL ERROR] Lỗi: {error_msg}")
+                            raise Exception(f"[FATAL] Executor crash khi xử lý bảng {table_name}. Job đã dừng.") from e
+                        else:
+                            # Lỗi khác (SQL, Iceberg, S3) → có thể tiếp tục hoặc dừng tùy vào yêu cầu
+                            # Hiện tại: tiếp tục chạy các bảng khác, chỉ log lỗi
+                            print(f"[ERROR] Lỗi khi xử lý bảng {table_name}, tiếp tục với các bảng khác...")
+                            # Không raise exception để job tiếp tục chạy các bảng khác
                     
         except Exception as e:
             error_msg = f"Loi nghiem trong trong job Etl_Runner: {str(e)}"

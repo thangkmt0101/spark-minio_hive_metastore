@@ -4,27 +4,23 @@
 SELECT 
 '{{year_utc_7}}-{{month_utc_7}}-{{day_utc_7}}' ||  '00' as datetime_id,
 '{{year_utc_7}}-{{month_utc_7}}-{{day_utc_7}}' as date,
-split(A.CHECKOUT_TOLL_NAME, '\\s*-\\s*')[1] AS route,
-CASE 
-        WHEN A.VEHICLE_TYPE = '1' THEN 'Xe < 12 chỗ, xe tải < 2 tấn; xe buýt công cộng'
-        WHEN A.VEHICLE_TYPE = '2' THEN 'Xe 12-30 chỗ; xe tải 2 đến <4 tấn'
-        WHEN A.VEHICLE_TYPE = '3' THEN 'Xe >= 31 chỗ; xe tải 4 đến <10 tấn'
-        WHEN A.VEHICLE_TYPE = '4' THEN 'Xe tải 10 đến <18 tấn; xe Container 20 fit'
-        WHEN A.VEHICLE_TYPE = '5' THEN 'Xe tải >= 18 tấn; xe Container 40 fit'
-        ELSE 'Lỗi, chưa có mô tả'
-END AS vehicle_transaction_type, -- loại phương tiện 
+cycle_name AS route,
+d.name AS vehicle_transaction_type, -- loại phương tiện 
 A.CHECKOUT_TOLL_NAME AS plaza_name, -- tên trạm
-B.VEHICLE_GROUP AS revenue_group,  -- Nhóm phương tiện
-COUNT(*) AS transaction_count,
-SUM(A.TOTAL_AMOUNT) AS gross_revenue,
-SUM(A.VOUCHER_USED_AMOUNT ) AS discount_amount,
+d.VEHICLE_GROUP AS revenue_group,  -- Nhóm phương tiện
+COUNT(distinct transport_trans_id) AS transaction_count,
+SUM(A.PRICE_AMOUNT) AS gross_revenue,
+NULL AS discount_amount,
 NULL AS tax_amount, --tạm fix do chưa biết cách tính
 NULL AS investment_amount, --tạm fix do chưa biết cách tính
 NULL AS net_revenue, --tạm fix do chưa biết cách tính
 'Loại phương tiện' AS type,
 'Đầu tư công' as cycle_type
-FROM ice.gold.fact_transport_transaction_stage A
-inner join ice.gold.dim_vehicle B on A.vehicle_id = B.vehicle_id
+FROM ice.gold.fact_transport_trans_stage_detail a
+INNER JOIN ice.gold.view_dim_toll_stage_closed b on a.stage_id = b.stage_id
+INNER JOIN ice.gold.dim_ap_domain c on c.type = 'VEHICLE_TYPE' and c.code = d.VEHICLE_TYPE
+INNER JOIN ice.gold.dim_price d on a.price_id = d.price_id
+INNER JOIN ice.gold.dim_vehicle e on a.vehicle_id = e.vehicle_id
 WHERE (
     {% for day_range in day_ranges %}
     (A.year = '{{ day_range.year }}'
@@ -34,18 +30,18 @@ WHERE (
     {% if not loop.last %} OR {% endif %}
     {% endfor %}
   )
-GROUP BY A.VEHICLE_TYPE, A.CHECKOUT_TOLL_NAME, B.VEHICLE_GROUP
+GROUP BY cycle_name,d.name,A.CHECKOUT_TOLL_NAME,d.VEHICLE_GROUP
 UNION ALL
 SELECT 
 '{{year_utc_7}}-{{month_utc_7}}-{{day_utc_7}}' ||  '00' as datetime_id,
 '{{year_utc_7}}-{{month_utc_7}}-{{day_utc_7}}' as date,
-split(A.CHECKOUT_TOLL_NAME, '\\s*-\\s*')[1] AS route,
+cycle_name AS route,
 'ETC' AS vehicle_transaction_type, -- loại giao dịch
 A.CHECKOUT_TOLL_NAME AS plaza_name, -- tên trạm
-B.VEHICLE_GROUP AS revenue_group,  -- Nhóm phương tiện
-COUNT(*) AS transaction_count,
-SUM(A.TOTAL_AMOUNT) AS gross_revenue,
-SUM(A.VOUCHER_USED_AMOUNT ) AS discount_amount,
+d.VEHICLE_GROUP AS revenue_group,  -- Nhóm phương tiện
+COUNT(distinct transport_trans_id) AS transaction_count,
+SUM(A.PRICE_AMOUNT) AS gross_revenue,
+NULL AS discount_amount,
 NULL AS tax_amount, --tạm fix do chưa biết cách tính
 NULL AS investment_amount, --tạm fix do chưa biết cách tính
 NULL AS net_revenue, --tạm fix do chưa biết cách tính
@@ -62,4 +58,4 @@ WHERE (
     {% if not loop.last %} OR {% endif %}
     {% endfor %}
   )
-GROUP BY A.checkout_channel, A.CHECKOUT_TOLL_NAME, B.VEHICLE_GROUP
+GROUP BY cycle_name,A.CHECKOUT_TOLL_NAME,d.VEHICLE_GROUP
