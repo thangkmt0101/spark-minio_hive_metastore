@@ -6,7 +6,7 @@ SELECT
 '{{year_utc_7}}-{{month_utc_7}}-{{day_utc_7}}' ||  '00' as datetime_id,
 '{{year_utc_7}}-{{month_utc_7}}-{{day_utc_7}}' as date,
 cycle_name AS route,
-d.name AS vehicle_transaction_type, -- Loại phương tiện
+c.name AS vehicle_transaction_type, -- Loại phương tiện
 e.VEHICLE_GROUP AS revenue_group,
 COUNT(distinct transport_trans_id) AS transaction_count,
 SUM(A.PRICE_AMOUNT) AS gross_revenue,
