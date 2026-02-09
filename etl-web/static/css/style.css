@@ -250,6 +250,16 @@ form {
     background-color: white;
 }
 
+/* SQL Path textarea - rộng và dễ nhìn hơn */
+.form-group textarea#sqlPath {
+    font-size: 15px;
+    padding: 14px;
+    line-height: 1.6;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    resize: vertical;
+    min-height: 60px;
+}
+
 .form-group select {
     cursor: pointer;
     appearance: none;
