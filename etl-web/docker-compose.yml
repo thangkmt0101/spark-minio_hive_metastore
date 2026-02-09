@@ -23,33 +23,15 @@ services:
     restart: unless-stopped
 
   # Flask Web Application
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  etl-web:
     image: etl-web:latest
-    container_name: etl-web
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-postgres}
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
       APP_PORT: ${APP_PORT:-5333}
-      FLASK_DEBUG: 0  # Production mode
     ports:
       - "${APP_PORT:-5333}:5333"
-    volumes:
-      - ./templates:/app/templates
-      - ./static:/app/static
-    depends_on:
-      postgres:
-        condition: service_healthy
+    container_name: etl-web
     networks:
-      - etl-network
-    restart: unless-stopped  # Tự động restart nếu container bị stop
-    stdin_open: true         # Keep stdin open
-    tty: true                # Allocate pseudo-TTY để container chạy mãi
+      - app-network            # Allocate pseudo-TTY để container chạy mãi
 
 volumes:
   postgres_data:
