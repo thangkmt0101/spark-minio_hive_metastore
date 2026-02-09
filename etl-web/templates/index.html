@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý ETL Jobs</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-database"></i> Quản lý ETL Jobs</h1>
+            <button id="btnAdd" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Thêm Job Mới
+            </button>
+        </header>
+
+        <main>
+            <!-- Form nhập liệu -->
+            <div id="formModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="formTitle">Thêm ETL Job Mới</h2>
+                        <span class="close">&times;</span>
+                    </div>
+                    <form id="jobForm">
+                        <input type="hidden" id="jobId">
+                        
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="jobType">
+                                    <i class="fas fa-briefcase"></i> Loại Job <span class="required">*</span>
+                                </label>
+                                <select id="jobType" name="job_type" required>
+                                    <option value="">-- Chọn loại job --</option>
+                                    <option value="1">1 - Daily (Hàng ngày)</option>
+                                    <option value="2">2 - Weekly (Hàng tuần)</option>
+                                    <option value="3">3 - Month (Hàng tháng)</option>
+                                    <option value="4">4 - Quarter (Hàng quý)</option>
+                                    <option value="5">5 - Year (Hàng năm)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="schemaName">
+                                    <i class="fas fa-layer-group"></i> Tên Schema <span class="required">*</span>
+                                </label>
+                                <input type="text" id="schemaName" name="schema_name" required maxlength="50">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="tableName">
+                                    <i class="fas fa-table"></i> Tên Bảng <span class="required">*</span>
+                                </label>
+                                <input type="text" id="tableName" name="table_name" required maxlength="200">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="sqlPath">
+                                    <i class="fas fa-file-code"></i> Đường dẫn SQL
+                                </label>
+                                <input type="text" id="sqlPath" name="sql_path" maxlength="500">
+                            </div>
+
+                            <div class="form-group full-width">
+                                <label for="description">
+                                    <i class="fas fa-align-left"></i> Mô tả
+                                </label>
+                                <textarea id="description" name="description" rows="3" maxlength="500"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="isActive" name="is_active" checked>
+                                    <span><i class="fas fa-check-circle"></i> Kích hoạt</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary" id="btnCancel">
+                                <i class="fas fa-times"></i> Hủy
+                            </button>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save"></i> Lưu
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <div class="filter-header">
+                    <h3><i class="fas fa-filter"></i> Lọc theo loại Job</h3>
+                    <span id="filterCount" class="filter-count">Hiển thị: <strong>0</strong> job</span>
+                </div>
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-filter="all">
+                        <i class="fas fa-list"></i> Tất cả
+                    </button>
+                    <button class="filter-btn" data-filter="1">
+                        <i class="fas fa-calendar-day"></i> Daily
+                    </button>
+                    <button class="filter-btn" data-filter="2">
+                        <i class="fas fa-calendar-week"></i> Weekly
+                    </button>
+                    <button class="filter-btn" data-filter="3">
+                        <i class="fas fa-calendar-alt"></i> Month
+                    </button>
+                    <button class="filter-btn" data-filter="4">
+                        <i class="fas fa-calendar"></i> Quarter
+                    </button>
+                    <button class="filter-btn" data-filter="5">
+                        <i class="fas fa-calendar-check"></i> Year
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search and Status Filter Section -->
+            <div class="search-filter-section">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Tìm kiếm theo tên bảng..."
+                        autocomplete="off"
+                    >
+                    <button id="clearSearch" class="clear-search" style="display: none;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="status-filter">
+                    <label for="statusFilter">
+                        <i class="fas fa-toggle-on"></i> Trạng thái:
+                    </label>
+                    <select id="statusFilter">
+                        <option value="all">Tất cả</option>
+                        <option value="active">Hoạt động</option>
+                        <option value="inactive">Không hoạt động</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Bảng hiển thị dữ liệu -->
+            <div class="table-container">
+                <table id="jobTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Loại Job</th>
+                            <th>Schema</th>
+                            <th>Bảng</th>
+                            <th>SQL Path</th>
+                            <th>Mô tả</th>
+                            <th>Trạng thái</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="jobTableBody">
+                        <tr>
+                            <td colspan="8" class="loading">
+                                <i class="fas fa-spinner fa-spin"></i> Đang tải dữ liệu...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- SQL Path Modal -->
+    <div id="sqlPathModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>SQL Path</h2>
+                <span class="close" onclick="closeSqlPathModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="sql-path-display">
+                    <label>Đường dẫn đầy đủ:</label>
+                    <div class="sql-path-full" id="sqlPathFullText"></div>
+                    <button class="btn btn-primary" onclick="copySqlPathFromModal(this)">
+                        <i class="fas fa-copy"></i> Copy Path
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
