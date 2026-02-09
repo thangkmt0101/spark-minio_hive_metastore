@@ -458,3 +458,322 @@ function showSuccess(message) {
 function showError(message) {
     alert('✗ ' + message);
 }
+
+// ==================== EXPORT CSV FUNCTIONS ====================
+
+function exportToCSV() {
+    // Get current filtered jobs
+    let dataToExport = allJobs;
+    
+    // Apply current filters
+    if (currentFilter !== 'all') {
+        dataToExport = dataToExport.filter(job => job.job_type === currentFilter);
+    }
+    
+    if (currentStatus !== 'all') {
+        const isActive = currentStatus === 'active';
+        dataToExport = dataToExport.filter(job => job.is_active === isActive);
+    }
+    
+    if (currentSearch) {
+        dataToExport = dataToExport.filter(job => {
+            const tableName = (job.table_name || '').toLowerCase();
+            return tableName.includes(currentSearch);
+        });
+    }
+    
+    if (dataToExport.length === 0) {
+        showError('Không có dữ liệu để export!');
+        return;
+    }
+    
+    // Create CSV header
+    const headers = ['ID', 'Loại Job', 'Schema', 'Tên Bảng', 'Đường dẫn SQL', 'Mô tả', 'Trạng thái', 'Ngày tạo', 'Ngày cập nhật'];
+    
+    // Create CSV rows
+    const rows = dataToExport.map(job => [
+        job.id,
+        `${job.job_type} - ${getJobTypeLabel(job.job_type)}`,
+        job.schema_name || '',
+        job.table_name || '',
+        job.sql_path || '',
+        job.description || '',
+        job.is_active ? 'Hoạt động' : 'Không hoạt động',
+        job.created_at || '',
+        job.updated_at || ''
+    ]);
+    
+    // Combine header and rows
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+    
+    // Add BOM for UTF-8 encoding (Excel compatibility)
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    // Create download link
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const filename = `etl_jobs_${timestamp}.csv`;
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Show success message
+    showSuccess(`Đã export ${dataToExport.length} bản ghi ra file ${filename}`);
+}
+
+// ==================== IMPORT EXCEL FUNCTIONS ====================
+
+let selectedFile = null;
+let previewData = null;
+
+// Open Import Modal
+function openImportModal() {
+    document.getElementById('importModal').classList.add('show');
+    selectedFile = null;
+    previewData = null;
+    document.getElementById('excelFile').value = '';
+    document.getElementById('fileInfo').style.display = 'none';
+    document.getElementById('btnPreview').disabled = true;
+}
+
+// Close Import Modal
+function closeImportModal() {
+    document.getElementById('importModal').classList.remove('show');
+}
+
+// Handle File Selection
+document.addEventListener('DOMContentLoaded', () => {
+    const btnExport = document.getElementById('btnExport');
+    const btnImport = document.getElementById('btnImport');
+    const excelFileInput = document.getElementById('excelFile');
+    const btnPreview = document.getElementById('btnPreview');
+    const btnConfirmImport = document.getElementById('btnConfirmImport');
+    
+    if (btnExport) {
+        btnExport.addEventListener('click', exportToCSV);
+    }
+    
+    if (btnImport) {
+        btnImport.addEventListener('click', openImportModal);
+    }
+    
+    if (excelFileInput) {
+        excelFileInput.addEventListener('change', handleFileSelect);
+    }
+    
+    if (btnPreview) {
+        btnPreview.addEventListener('click', previewExcelData);
+    }
+    
+    if (btnConfirmImport) {
+        btnConfirmImport.addEventListener('click', confirmImport);
+    }
+    
+    // Drag and drop
+    const fileUploadArea = document.getElementById('fileUploadArea');
+    if (fileUploadArea) {
+        fileUploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUploadArea.style.borderColor = 'var(--primary-color)';
+            fileUploadArea.style.background = 'var(--light-color)';
+        });
+        
+        fileUploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            fileUploadArea.style.borderColor = '';
+            fileUploadArea.style.background = '';
+        });
+        
+        fileUploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUploadArea.style.borderColor = '';
+            fileUploadArea.style.background = '';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('excelFile').files = files;
+                handleFileSelect();
+            }
+        });
+    }
+});
+
+function handleFileSelect() {
+    const fileInput = document.getElementById('excelFile');
+    const file = fileInput.files[0];
+    
+    if (!file) return;
+    
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+        showError('File quá lớn! Kích thước tối đa 5MB');
+        fileInput.value = '';
+        return;
+    }
+    
+    // Validate file type
+    const validTypes = ['.xlsx', '.xls'];
+    const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+    if (!validTypes.includes(fileExt)) {
+        showError('File không hợp lệ! Chỉ chấp nhận .xlsx, .xls');
+        fileInput.value = '';
+        return;
+    }
+    
+    selectedFile = file;
+    
+    // Show file info
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileSize').textContent = formatFileSize(file.size);
+    document.getElementById('fileInfo').style.display = 'block';
+    document.getElementById('btnPreview').disabled = false;
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+async function previewExcelData() {
+    if (!selectedFile) {
+        showError('Chưa chọn file!');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    
+    try {
+        document.getElementById('btnPreview').disabled = true;
+        document.getElementById('btnPreview').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang xử lý...';
+        
+        const response = await fetch(`${API_URL}/import/preview`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            previewData = result.data;
+            showPreviewModal(result.data, result.summary);
+            closeImportModal();
+        } else {
+            showError(result.error || 'Lỗi preview dữ liệu');
+        }
+    } catch (error) {
+        showError('Lỗi kết nối: ' + error.message);
+    } finally {
+        document.getElementById('btnPreview').disabled = false;
+        document.getElementById('btnPreview').innerHTML = '<i class="fas fa-eye"></i> Preview Dữ liệu';
+    }
+}
+
+function showPreviewModal(data, summary) {
+    const modal = document.getElementById('previewModal');
+    const tbody = document.getElementById('previewTableBody');
+    
+    // Update summary
+    document.getElementById('totalRecords').textContent = summary.total;
+    document.getElementById('validRecords').textContent = summary.valid;
+    
+    // Show errors if any
+    const errorSummary = document.getElementById('errorSummary');
+    if (summary.errors && summary.errors.length > 0) {
+        errorSummary.style.display = 'block';
+        errorSummary.innerHTML = `<strong>Lỗi validation:</strong><br>${summary.errors.join('<br>')}`;
+    } else {
+        errorSummary.style.display = 'none';
+    }
+    
+    // Render table
+    tbody.innerHTML = data.map(row => `
+        <tr class="${row.valid ? '' : 'invalid-row'}">
+            <td>${row.row_number}</td>
+            <td>
+                <span class="job-type-badge">
+                    ${row.job_type} - ${getJobTypeLabel(row.job_type)}
+                </span>
+            </td>
+            <td>${row.schema_name}</td>
+            <td>${row.table_name}</td>
+            <td title="${row.sql_path}">${truncate(row.sql_path || '-', 30)}</td>
+            <td title="${row.description}">${truncate(row.description || '-', 30)}</td>
+            <td>
+                <span class="status-badge ${row.is_active ? 'status-active' : 'status-inactive'}">
+                    ${row.is_active ? 'Hoạt động' : 'Không hoạt động'}
+                </span>
+            </td>
+            <td>
+                ${row.valid 
+                    ? '<span style="color: green;"><i class="fas fa-check-circle"></i> Hợp lệ</span>' 
+                    : '<span style="color: red;"><i class="fas fa-times-circle"></i> ' + row.errors.join(', ') + '</span>'}
+            </td>
+        </tr>
+    `).join('');
+    
+    modal.classList.add('show');
+}
+
+function closePreviewModal() {
+    document.getElementById('previewModal').classList.remove('show');
+}
+
+async function confirmImport() {
+    if (!previewData) {
+        showError('Không có dữ liệu để import!');
+        return;
+    }
+    
+    const validData = previewData.filter(r => r.valid);
+    
+    if (validData.length === 0) {
+        showError('Không có bản ghi hợp lệ để import!');
+        return;
+    }
+    
+    if (!confirm(`Xác nhận import ${validData.length} bản ghi vào database?`)) {
+        return;
+    }
+    
+    try {
+        document.getElementById('btnConfirmImport').disabled = true;
+        document.getElementById('btnConfirmImport').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang import...';
+        
+        const response = await fetch(`${API_URL}/import/confirm`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ records: previewData })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showSuccess(result.message);
+            closePreviewModal();
+            loadJobs(); // Reload data
+        } else {
+            showError(result.error || 'Lỗi import dữ liệu');
+        }
+    } catch (error) {
+        showError('Lỗi kết nối: ' + error.message);
+    } finally {
+        document.getElementById('btnConfirmImport').disabled = false;
+        document.getElementById('btnConfirmImport').innerHTML = '<i class="fas fa-check"></i> Xác nhận Import';
+    }
+}

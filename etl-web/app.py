@@ -5,6 +5,8 @@ from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import os
 from dotenv import load_dotenv
+import pandas as pd
+from werkzeug.utils import secure_filename
 
 # Load environment variables từ file .env
 load_dotenv()
@@ -152,6 +154,150 @@ def delete_job(job_id):
         conn.close()
         
         return jsonify({'success': True, 'message': 'Xóa job thành công'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/import/preview', methods=['POST'])
+def preview_import():
+    """Preview dữ liệu từ file Excel trước khi import"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'Không có file được upload'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'Chưa chọn file'}), 400
+        
+        # Check file extension
+        if not file.filename.lower().endswith(('.xlsx', '.xls')):
+            return jsonify({'success': False, 'error': 'File phải có định dạng .xlsx hoặc .xls'}), 400
+        
+        # Read Excel file
+        df = pd.read_excel(file)
+        
+        # Validate columns
+        required_columns = ['job_type', 'schema_name', 'table_name']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        
+        if missing_columns:
+            return jsonify({
+                'success': False,
+                'error': f'File thiếu các cột bắt buộc: {", ".join(missing_columns)}'
+            }), 400
+        
+        # Convert DataFrame to list of dicts
+        records = []
+        errors = []
+        
+        for idx, row in df.iterrows():
+            record = {
+                'row_number': idx + 2,  # Excel row number (1-based + header)
+                'job_type': str(row.get('job_type', '')).strip(),
+                'schema_name': str(row.get('schema_name', '')).strip(),
+                'table_name': str(row.get('table_name', '')).strip(),
+                'sql_path': str(row.get('sql_path', '')).strip() if pd.notna(row.get('sql_path')) else '',
+                'description': str(row.get('description', '')).strip() if pd.notna(row.get('description')) else '',
+                'is_active': bool(row.get('is_active', True)) if pd.notna(row.get('is_active')) else True,
+                'valid': True,
+                'errors': []
+            }
+            
+            # Validation
+            if not record['job_type'] or record['job_type'] not in ['1', '2', '3', '4', '5']:
+                record['valid'] = False
+                record['errors'].append('Loại job không hợp lệ (phải là 1-5)')
+            
+            if not record['schema_name']:
+                record['valid'] = False
+                record['errors'].append('Schema name không được rỗng')
+            
+            if not record['table_name']:
+                record['valid'] = False
+                record['errors'].append('Table name không được rỗng')
+            
+            if not record['valid']:
+                errors.append(f"Dòng {record['row_number']}: {', '.join(record['errors'])}")
+            
+            records.append(record)
+        
+        valid_count = sum(1 for r in records if r['valid'])
+        
+        return jsonify({
+            'success': True,
+            'data': records,
+            'summary': {
+                'total': len(records),
+                'valid': valid_count,
+                'invalid': len(records) - valid_count,
+                'errors': errors
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Lỗi đọc file: {str(e)}'}), 500
+
+@app.route('/api/import/confirm', methods=['POST'])
+def confirm_import():
+    """Import dữ liệu đã được preview và validate"""
+    try:
+        data = request.json
+        records = data.get('records', [])
+        
+        if not records:
+            return jsonify({'success': False, 'error': 'Không có dữ liệu để import'}), 400
+        
+        # Filter only valid records
+        valid_records = [r for r in records if r.get('valid', False)]
+        
+        if not valid_records:
+            return jsonify({'success': False, 'error': 'Không có bản ghi hợp lệ để import'}), 400
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Get current MAX ID
+        cur.execute("SELECT MAX(id) FROM etl_job")
+        max_id = cur.fetchone()[0] or 0
+        
+        inserted_count = 0
+        errors = []
+        
+        for record in valid_records:
+            try:
+                max_id += 1
+                cur.execute("""
+                    INSERT INTO etl_job (
+                        id, job_type, schema_name, table_name, sql_path,
+                        description, is_active, created_at, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    max_id,
+                    record.get('job_type'),
+                    record.get('schema_name'),
+                    record.get('table_name'),
+                    record.get('sql_path'),
+                    record.get('description'),
+                    record.get('is_active', True),
+                    datetime.now(),
+                    datetime.now()
+                ))
+                inserted_count += 1
+            except Exception as e:
+                errors.append(f"Dòng {record.get('row_number')}: {str(e)}")
+                max_id -= 1  # Rollback ID increment
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã import thành công {inserted_count}/{len(valid_records)} bản ghi',
+            'inserted': inserted_count,
+            'errors': errors
+        })
+        
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

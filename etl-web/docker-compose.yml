@@ -38,7 +38,7 @@ services:
       APP_PORT: ${APP_PORT:-5333}
       FLASK_DEBUG: 0  # Production mode
     ports:
-      - "${APP_PORT:-5333}:5333"
+      - "${APP_PORT:-5333}:${APP_PORT:-5333}"
     volumes:
       - ./templates:/app/templates
       - ./static:/app/static

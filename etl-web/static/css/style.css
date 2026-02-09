@@ -48,6 +48,11 @@ header h1 {
     font-weight: 600;
 }
 
+.header-actions {
+    display: flex;
+    gap: 12px;
+}
+
 header h1 i {
     margin-right: 10px;
 }
@@ -780,4 +785,121 @@ tbody td[title]:not([title=""]) {
 .empty-state p {
     font-size: 18px;
     margin-bottom: 20px;
+}
+
+/* Import Excel Styles */
+.file-upload-area {
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    padding: 40px 20px;
+    text-align: center;
+    transition: all 0.3s ease;
+    background: var(--light-color);
+    cursor: pointer;
+}
+
+.file-upload-area:hover {
+    border-color: var(--primary-color);
+    background: #f0f8f0;
+}
+
+.file-upload-area i {
+    color: var(--primary-color);
+    margin-bottom: 15px;
+}
+
+.file-upload-area p {
+    margin: 10px 0;
+    color: var(--dark-color);
+}
+
+.file-hint {
+    font-size: 12px;
+    color: var(--secondary-color);
+}
+
+.file-info {
+    margin-top: 20px;
+    padding: 15px;
+    background: var(--light-color);
+    border-radius: 6px;
+    text-align: left;
+}
+
+.file-info p {
+    margin: 5px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.file-info i {
+    color: #2ecc71;
+}
+
+.import-section {
+    margin-bottom: 20px;
+}
+
+.modal-large {
+    max-width: 1200px;
+}
+
+.preview-info {
+    background: var(--light-color);
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.preview-info p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.preview-info strong {
+    color: var(--dark-color);
+}
+
+.preview-info span {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.error-summary {
+    background: #fff3cd;
+    color: #856404;
+    padding: 12px;
+    border-radius: 4px;
+    border-left: 4px solid #ffc107;
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+.invalid-row {
+    background-color: #ffebee !important;
+}
+
+.invalid-row:hover {
+    background-color: #ffcdd2 !important;
+}
+
+/* Modal Actions */
+.modal-actions {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 2px solid var(--light-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+/* Responsive for large modal */
+@media (max-width: 1200px) {
+    .modal-large {
+        max-width: 95%;
+    }
 }
