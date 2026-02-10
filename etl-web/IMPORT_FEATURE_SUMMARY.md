@@ -60,15 +60,15 @@ Cho phép import hàng loạt dữ liệu từ file Excel vào bảng `etl_job` 
 
 ## 📋 Cấu trúc File Excel
 
-### Columns Required:
+### Columns Required (Bắt buộc):
 - `job_type` - Loại job (1-5)
 - `schema_name` - Tên schema
 - `table_name` - Tên bảng
-
-### Columns Optional:
 - `sql_path` - Đường dẫn SQL
+- `is_active` - TRUE/FALSE
+
+### Columns Optional (Tùy chọn):
 - `description` - Mô tả
-- `is_active` - TRUE/FALSE (default: TRUE)
 
 ### Example Data:
 
@@ -95,16 +95,18 @@ Cho phép import hàng loạt dữ liệu từ file Excel vào bảng `etl_job` 
 - ❌ Không được rỗng
 
 ### 4. sql_path
-- ✅ Optional
+- ✅ Required
 - ✅ Max 500 ký tự
+- ❌ Không được rỗng
 
 ### 5. description
 - ✅ Optional
 - ✅ Max 500 ký tự
 
 ### 6. is_active
-- ✅ TRUE/FALSE
-- ✅ Default: TRUE nếu không có
+- ✅ Required
+- ✅ Phải là TRUE hoặc FALSE
+- ❌ Không được rỗng
 
 ## 🛠️ Technical Stack
 

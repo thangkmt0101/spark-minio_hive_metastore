@@ -191,6 +191,15 @@ def preview_import():
         errors = []
         
         for idx, row in df.iterrows():
+            # Parse is_active
+            is_active_value = row.get('is_active', '')
+            if pd.notna(is_active_value):
+                is_active_str = str(is_active_value).strip().upper()
+                is_active = is_active_str in ['TRUE', '1', 'YES', 'Y']
+            else:
+                is_active_str = ''
+                is_active = None
+            
             record = {
                 'row_number': idx + 2,  # Excel row number (1-based + header)
                 'job_type': str(row.get('job_type', '')).strip(),
@@ -198,7 +207,7 @@ def preview_import():
                 'table_name': str(row.get('table_name', '')).strip(),
                 'sql_path': str(row.get('sql_path', '')).strip() if pd.notna(row.get('sql_path')) else '',
                 'description': str(row.get('description', '')).strip() if pd.notna(row.get('description')) else '',
-                'is_active': bool(row.get('is_active', True)) if pd.notna(row.get('is_active')) else True,
+                'is_active': is_active,
                 'valid': True,
                 'errors': []
             }
@@ -215,6 +224,14 @@ def preview_import():
             if not record['table_name']:
                 record['valid'] = False
                 record['errors'].append('Table name không được rỗng')
+            
+            if not record['sql_path']:
+                record['valid'] = False
+                record['errors'].append('SQL Path không được rỗng')
+            
+            if record['is_active'] is None:
+                record['valid'] = False
+                record['errors'].append('is_active không hợp lệ (phải là TRUE/FALSE)')
             
             if not record['valid']:
                 errors.append(f"Dòng {record['row_number']}: {', '.join(record['errors'])}")

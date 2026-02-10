@@ -201,12 +201,75 @@
 
     <!-- Import Excel Modal -->
     <div id="importModal" class="modal">
-        <div class="modal-content modal-small">
+        <div class="modal-content modal-medium">
             <div class="modal-header">
                 <h2><i class="fas fa-file-excel"></i> Import từ Excel</h2>
                 <span class="close" onclick="closeImportModal()">&times;</span>
             </div>
             <div class="modal-body">
+                <!-- Excel Format Guide -->
+                <div class="excel-format-guide">
+                    <h3><i class="fas fa-info-circle"></i> Cấu trúc file Excel</h3>
+                    <div class="format-table-wrapper">
+                        <table class="format-table">
+                            <thead>
+                                <tr>
+                                    <th>Tên cột</th>
+                                    <th>Bắt buộc</th>
+                                    <th>Giá trị</th>
+                                    <th>Ví dụ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>job_type</strong></td>
+                                    <td><span class="badge-required">Bắt buộc</span></td>
+                                    <td>1, 2, 3, 4, 5</td>
+                                    <td>1 (Daily), 2 (Weekly)</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>schema_name</strong></td>
+                                    <td><span class="badge-required">Bắt buộc</span></td>
+                                    <td>Tên schema</td>
+                                    <td>public, analytics</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>table_name</strong></td>
+                                    <td><span class="badge-required">Bắt buộc</span></td>
+                                    <td>Tên bảng</td>
+                                    <td>customers, orders</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>sql_path</strong></td>
+                                    <td><span class="badge-required">Bắt buộc</span></td>
+                                    <td>Đường dẫn SQL</td>
+                                    <td>/sql/extract.sql</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>description</strong></td>
+                                    <td><span class="badge-optional">Tùy chọn</span></td>
+                                    <td>Mô tả</td>
+                                    <td>Extract customer data</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>is_active</strong></td>
+                                    <td><span class="badge-required">Bắt buộc</span></td>
+                                    <td>TRUE/FALSE</td>
+                                    <td>TRUE, FALSE</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="job-type-legend">
+                        <strong>Loại Job:</strong>
+                        <span>1=Daily</span> | 
+                        <span>2=Weekly</span> | 
+                        <span>3=Month</span> | 
+                        <span>4=Quarter</span> | 
+                        <span>5=Year</span>
+                    </div>
+                </div>
+
                 <div class="import-section">
                     <div class="file-upload-area" id="fileUploadArea">
                         <i class="fas fa-cloud-upload-alt fa-3x"></i>
