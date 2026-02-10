@@ -1,0 +1,20 @@
+CREATE TABLE etl_table_migrate_brand (
+	process_group_id varchar(200) NULL,
+	process_group_name varchar(200) NULL,
+	process_id varchar(200) NULL,
+	process_name varchar(200) NULL,
+	status varchar(50) NULL,
+	updated_at date NULL,
+	record_count int8 NULL
+);
+
+has_data : ${record.count:toNumber():gt(0)}
+no_data: ${record.count:toNumber():equals(0)}
+
+1. Các process dùng cho nifi
+ExecuteSQLRecord
+UpdateAttribute
+RouteOnAttribute
+SplitRecord
+PublishKafka
+PutSQL

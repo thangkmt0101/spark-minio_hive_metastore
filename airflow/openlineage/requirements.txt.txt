@@ -1,0 +1,11 @@
+apache-airflow-providers-openlineage
+
+CREATE TABLE etl_table_migrate_brand (
+	process_group_id varchar(200) NULL,
+	process_group_name varchar(200) NULL,
+	process_id varchar(200) NULL,
+	process_name varchar(200) NULL,
+	status varchar(50) NULL,
+	updated_at date NULL,
+	record_count int8 NULL
+);
