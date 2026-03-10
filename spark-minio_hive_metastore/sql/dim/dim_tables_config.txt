@@ -6,4 +6,3 @@ ice.gold.dim_vehicle|dim_vehicle
 ice.gold.dim_price|dim_price
 ice.gold.dim_toll_cycle|dim_toll_cycle
 ice.gold.view_dim_toll_stage_closed|view_dim_toll_stage_closed
-

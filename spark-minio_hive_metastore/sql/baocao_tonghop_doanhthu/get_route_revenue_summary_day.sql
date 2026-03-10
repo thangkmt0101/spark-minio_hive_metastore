@@ -30,7 +30,7 @@ WHERE (
     {% if not loop.last %} OR {% endif %}
     {% endfor %}
   )
-GROUP BY cycle_name,d.name,e.VEHICLE_GROUP
+GROUP BY cycle_name,c.name,e.VEHICLE_GROUP
 
 UNION ALL
 SELECT 

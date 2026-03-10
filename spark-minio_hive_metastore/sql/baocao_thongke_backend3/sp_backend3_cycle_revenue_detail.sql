@@ -11,7 +11,7 @@ SELECT
  INNER JOIN ice.gold.view_dim_toll_stage_closed c on a.stage_id = c.stage_id
  INNER JOIN ice.gold.dim_price d on a.price_id = d.price_id
  INNER JOIN ice.gold.dim_ap_domain dap on dap.type = 'VEHICLE_TYPE' and dap.code = d.VEHICLE_TYPE
- WHERE 
+ WHERE
  (
     {% for day_range in day_ranges %}
     (A.year = '{{ day_range.year }}'
