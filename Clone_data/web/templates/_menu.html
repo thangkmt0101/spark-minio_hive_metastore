@@ -1,0 +1,20 @@
+<nav class="layout-nav">
+  <div class="nav-brand">
+    <span class="nav-brand-icon">&#128257;</span>
+    <span class="nav-brand-text">Oracle Sync</span>
+  </div>
+  <div class="nav-section-label">Cấu hình</div>
+  <a href="{{ url_for('connection_page') }}" class="{{ 'active' if active == 'connection' else '' }}">
+    <span class="nav-icon">&#128279;</span> Kết nối
+  </a>
+  <div class="nav-section-label">Đồng bộ</div>
+  <a href="{{ url_for('index') }}" class="{{ 'active' if active == 'jobs' else '' }}">
+    <span class="nav-icon">&#9776;</span> Danh sách job
+  </a>
+  <a href="{{ url_for('job_new_page') }}" class="{{ 'active' if active == 'job_new' else '' }}">
+    <span class="nav-icon">&#43;</span> Thêm job mới
+  </a>
+  <a href="{{ url_for('jobs_errors') }}" class="{{ 'active' if active == 'jobs_errors' else '' }}">
+    <span class="nav-icon">&#10007;</span> Bảng lỗi
+  </a>
+</nav>

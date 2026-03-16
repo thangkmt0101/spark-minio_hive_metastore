@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<histories>
+  <history id="1">
+    <stmt_id>119</stmt_id>
+    <job_name>TEST</job_name>
+    <target_table>DM_MA_THOI_GIANS</target_table>
+    <run_at>2026-03-16 10:58:11</run_at>
+    <status>success</status>
+    <delete_rows>17393</delete_rows>
+    <insert_rows>17393</insert_rows>
+    <message />
+  </history>
+</histories>

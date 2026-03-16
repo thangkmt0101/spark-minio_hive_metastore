@@ -1,0 +1,14 @@
+services:
+  oracle-sync:
+    build: .
+    container_name: oracle-sync-app
+    ports:
+      # HOST_PORT:CONTAINER_PORT — đổi HOST_PORT trong file .env
+      - "${HOST_PORT:-5000}:5000"
+    environment:
+      - PYTHONPATH=/app
+      - LARGE_TABLE_THRESHOLD=${LARGE_TABLE_THRESHOLD:-100000}
+    volumes:
+      # Mount thư mục scripts để data (XML, CSV) persistent ngoài container
+      - ./scripts:/app/scripts
+    restart: unless-stopped
