@@ -535,4 +535,12 @@ Help: https://python-oracledb.readthedocs.io/en/latest/user_guide/troubleshootin
     <status>success</status>
     <message />
   </run>
+  <run id="67">
+    <filename>JOB_PN_THI_HANH_AN.sql</filename>
+    <connection_id>2</connection_id>
+    <connection_name>QLPN</connection_name>
+    <run_at>2026-03-19 16:31:28</run_at>
+    <status>success</status>
+    <message />
+  </run>
 </runs>

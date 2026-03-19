@@ -9,11 +9,10 @@
 1. [Cấu trúc dự án](#cấu-trúc-dự-án)
 2. [Cách chạy](#cách-chạy)
 3. [Luồng nghiệp vụ chi tiết](#luồng-nghiệp-vụ-chi-tiết)
-   - [1. Khai báo kết nối](#1-khai-báo-kết-nối)
-   - [2. Tạo job đồng bộ](#2-tạo-job-đồng-bộ)
-   - [3. Mapping cột và sinh SQL](#3-mapping-cột-và-sinh-sql)
-   - [4. Thực thi đồng bộ](#4-thực-thi-đồng-bộ)
-   - [5. Theo dõi lịch sử và lỗi](#5-theo-dõi-lịch-sử-và-lỗi)
+   - [B1. Sửa kết nối](#b1-sửa-kết-nối)
+   - [B2. Chạy job delete](#b2-chạy-job-delete)
+   - [B3. Chạy các job Danh sách bảng cần đồng bộ](#b3-chạy-các-job-danh-sách-bảng-cần-đồng-bộ)
+   - [B4. Chạy tiếp danh sách script](#b4-chạy-tiếp-danh-sách-script)
 4. [Lưu trữ dữ liệu](#lưu-trữ-dữ-liệu)
 5. [API endpoints](#api-endpoints)
 6. [Docker](#docker)
@@ -27,7 +26,9 @@ Clone_data/
 ├── config/
 │   ├── file_config.py        # Đọc/ghi sync_config.xml (kết nối Oracle)
 │   ├── csv_statements.py     # Đọc/ghi job_sync.csv (danh sách job)
-│   └── xml_history.py        # Đọc/ghi job_his.xml (lịch sử chạy)
+│   ├── xml_history.py        # Đọc/ghi job_his.xml (lịch sử chạy job)
+│   ├── xml_deleted.py        # Đọc/ghi job_delete_his.xml (lịch sử DELETE)
+│   └── xml_script_history.py # Đọc/ghi script_his.xml (lịch sử chạy script)
 │
 ├── src/
 │   ├── metadata_loader.py    # Truy vấn user_tables / user_tab_columns từ Oracle
@@ -36,7 +37,11 @@ Clone_data/
 ├── scripts/                  # *** Data files — mount volume Docker ***
 │   ├── sync_config.xml       # Danh sách kết nối Oracle
 │   ├── job_sync.csv          # Danh sách job đồng bộ + câu lệnh SQL
-│   └── job_his.xml           # Lịch sử chạy từng job
+│   ├── job_his.xml           # Lịch sử chạy từng job
+│   ├── job_delete_his.xml    # Lịch sử câu lệnh DELETE đã thực thi
+│   ├── script_his.xml        # Lịch sử chạy script .sql
+│   ├── sql_notes.json        # Ghi chú theo tên file script
+│   └── sql/                  # Thư mục script .sql (scripts/sql/*.sql)
 │
 ├── web/
 │   ├── app.py                # Flask application — routes + business logic
@@ -50,7 +55,12 @@ Clone_data/
 │       ├── connection_edit.html    # Form sửa kết nối
 │       ├── job_errors.html         # Danh sách job lỗi gần nhất
 │       ├── job_history.html        # Lịch sử chạy của 1 job
-│       └── run_result.html         # Kết quả chạy (non-SSE)
+│       ├── job_stats_success.html  # Thống kê job chạy thành công
+│       ├── job_deleted_history.html# Lịch sử câu lệnh DELETE
+│       ├── run_result.html         # Kết quả chạy (non-SSE)
+│       ├── scripts.html           # Chạy script .sql
+│       ├── run_delete_scripts.html # Chạy JOB_DELETE_*.sql
+│       └── script_history.html    # Lịch sử chạy script
 │
 ├── Dockerfile
 ├── docker-compose.yml
@@ -130,104 +140,50 @@ docker compose up -d
 
 ## Luồng nghiệp vụ chi tiết
 
-### 1. Khai báo kết nối
+### B1. Sửa kết nối
 
 **Màn hình:** `Cấu hình → Kết nối`  
 **File lưu:** `scripts/sync_config.xml`
 
+**Điền đúng địa chỉ IP nguồn và đích** (Host, Port, Service name, Username, Password) cho từng kết nối.
+
 ```
-Người dùng điền: Tên, Loại (source/target), Host, Port, Service name, Username, Password
+Người dùng sửa: Host (IP nguồn/đích), Port, Service name, Username, Password
        ↓
-POST /connection/add
+POST /connection/<id>/update
        ↓
-file_config.py: add_connection()
-  - Kiểm tra tên kết nối không trùng (case-insensitive)
-  - Gán ID tự tăng
-  - Ghi vào sync_config.xml
+file_config.py: update_connection()
+  → Ghi vào sync_config.xml
 ```
 
-Mỗi kết nối lưu dưới dạng:
-```xml
-<connection id="1">
-  <name>QLPN_OLD</name>
-  <connection_type>source</connection_type>
-  <host>192.168.1.10</host>
-  <port>1521</port>
-  <service_name>ORCL</service_name>
-  <username>user1</username>
-  <password_enc>...</password_enc>
-</connection>
+Thêm mới: `POST /connection/add` — Kiểm tra tên không trùng, gán ID tự tăng.
+
+---
+
+### B2. Chạy job delete
+
+**Màn hình:** `Script → Chạy JOB_DELETE_PN_LAI_LICHS`  
+**Thư mục:** `scripts/sql/JOB_DELETE_*.sql`
+
+```
+Người dùng chọn: Script JOB_DELETE_* + Kết nối (target)
+Bấm "Chạy đã chọn"
+       ↓
+POST /api/scripts/run-one (async với run_id)
+  → Chạy tuần tự từng script
+  → Poll /api/scripts/run-status/<run_id>
+  → Có thể bấm "Dừng" → POST /api/scripts/stop/<run_id>
 ```
 
 ---
 
-### 2. Tạo job đồng bộ
+### B3. Chạy các job Danh sách bảng cần đồng bộ
 
-**Màn hình:** `Đồng bộ → Thêm job mới`  
-**File lưu:** `scripts/job_sync.csv`
+**Màn hình:** `Đồng bộ → Danh sách job` (trang chủ)
 
-```
-Người dùng chọn: Tên job, Kết nối nguồn, Kết nối đích
-Người dùng tích chọn: Bảng nguồn + Bảng đích (load từ Oracle qua API)
-       ↓
-POST /job/create
-       ↓
-csv_statements.py: add_statement_csv()
-  - Tạo bản ghi mới với ID tự tăng
-  - Lưu: id, name, source_connection_name, target_connection_name,
-          source_table, target_table, sql_text=""
-       ↓
-Redirect → Màn hình Mapping cột (/job/<id>/them-moi)
-```
+Chọn job cần chạy → Bấm "Chạy đã chọn" → Chọn số luồng (1–4).
 
-**API tải danh sách bảng** (`GET /api/connections/<id>/tables`):
-```
-metadata_loader.py: get_tables()
-  → Kết nối Oracle → SELECT table_name FROM user_tables
-  → Trả về danh sách tên bảng (hỗ trợ filter LIKE)
-```
-
----
-
-### 3. Mapping cột và sinh SQL
-
-**Màn hình:** `/job/<id>/them-moi`  
-**File lưu:** `scripts/job_sync.csv` (cột `sql_text`)
-
-```
-Tải cột bảng đích (tự động khi vào màn hình):
-  GET /api/connections/<id>/columns?table=<tên_bảng>
-  → metadata_loader.py: get_columns()
-  → SELECT column_name FROM user_tab_columns WHERE table_name = :tname
-
-Tải cột bảng nguồn (theo yêu cầu, hoặc khi sửa tên bảng nguồn):
-  Tương tự, từ kết nối nguồn
-
-Người dùng kéo/thêm cột vào vùng Mapping:
-  - Cột đích (Target Column) ← bên trái, readonly (lấy từ Oracle)
-  - Cột nguồn (Source Column) ← bên phải, có thể nhập tự do
-    (ví dụ: tên cột, hằng số "0 AS MTG_NAM", biểu thức, SYSDATE...)
-
-Sinh SQL (client-side JavaScript):
-  → INSERT INTO <target_conn>.<target_table> (col1, col2, ...)
-    SELECT expr1, expr2, ...
-    FROM <source_conn>.<source_table>
-
-Lưu SQL:
-  POST /job/<id>/save
-  → csv_statements.py: update_statement_csv()
-  → Ghi sql_text vào dòng id=<id> trong job_sync.csv
-```
-
-**Lưu ý:** Nếu đã có `sql_text` trong CSV, màn hình tự động parse lại SQL để hiển thị mapping hiện tại (dùng regex trong JavaScript).
-
----
-
-### 4. Thực thi đồng bộ
-
-**Màn hình:** `Danh sách job → Chọn job → Chạy đã chọn`
-
-#### 4a. Luồng SSE (giao diện chính)
+#### Luồng SSE (giao diện chính)
 
 ```
 Người dùng chọn checkbox các job cần chạy
@@ -254,9 +210,10 @@ app.py: jobs_run_stream()
     │ 4. Validate (bảng đích, sql, kết nối)│
     │ 5. Kết nối Oracle target             │
     │    → Lưu conn vào conns_map          │
-    │ 6. DELETE FROM target_conn.table     │
-    │    → commit()                        │
-    │ 7. _execute_insert():                │
+│ 6. DELETE FROM target_conn.table     │
+│    → commit()                        │
+│    → add_delete_op() → job_delete_his.xml
+│ 7. _execute_insert():                │
     │    a. COUNT(*) source rows           │
     │    b. Nếu > LARGE_TABLE_THRESHOLD:   │
     │       → INSERT /*+ APPEND */ INTO... │
@@ -279,7 +236,7 @@ app.py: jobs_run_stream()
 - Nhanh hơn 3–10× so với INSERT thông thường cho bảng lớn
 - Yêu cầu: COMMIT DELETE trước, COMMIT INSERT sau (không thể trong cùng transaction)
 
-#### 4b. Dừng job đang chạy
+#### Dừng job đang chạy
 
 ```
 Người dùng bấm "Dừng"
@@ -293,7 +250,7 @@ app.py: jobs_stop()
   - Các thread chưa bắt đầu → kiểm tra stop_event → bỏ qua
 ```
 
-#### 4c. Chạy tiếp (resume)
+#### Chạy tiếp (resume)
 
 Sau khi dừng hoặc có lỗi, nút **"Chạy tiếp"** xuất hiện:
 - Chỉ chạy lại các job **chưa hoàn thành** (loại trừ job đã success hoặc error)
@@ -301,33 +258,92 @@ Sau khi dừng hoặc có lỗi, nút **"Chạy tiếp"** xuất hiện:
 
 ---
 
-### 5. Theo dõi lịch sử và lỗi
+### B4. Chạy tiếp danh sách script
 
-#### Lịch sử chạy
+**Màn hình:** `Script → Chạy script .sql`  
+**Thư mục:** `scripts/sql/*.sql` (loại trừ `JOB_DELETE_*.sql` — có menu riêng B2)
 
-```
-Mỗi lần chạy job (thành công hoặc lỗi):
-  xml_history.py: add_history()
-  → Ghi 1 record vào job_his.xml:
-     stmt_id, job_name, target_table, run_at,
-     status (success/error), delete_rows, insert_rows, message
-```
-
-**Xem lịch sử:** Click icon ⊙ cạnh ID job → `/job/<id>/history`
-
-#### Bảng lỗi
-
-**Màn hình:** `Đồng bộ → Bảng lỗi`
+#### Luồng chạy script (async với run_id, poll status, stop)
 
 ```
-GET /jobs/errors
-  → xml_history.py: get_latest_errors()
-  → Lấy lần chạy gần nhất của mỗi job
-  → Lọc: chỉ giữ job có status = "error"
-  → Hiển thị: tên job, bảng đích, thời gian, thông báo lỗi
+Người dùng chọn: Script + Kết nối (target) cho từng dòng
+Bấm "Chạy đã chọn"
+       ↓
+Client gọi runScriptsSequential(pairs, 0):
+  Với mỗi script (chạy tuần tự):
+
+  1. Tạo run_id = 'script_' + Date.now() + '_' + index
+  2. POST /api/scripts/run-one
+     body: filename, connection_id, run_id
+       ↓
+  app.py: api_script_run_one()
+    - Nếu có run_id:
+      → Tạo stop_event, state dict
+      → _script_runs[run_id] = state
+      → Thread spawn: _script_run_worker(run_id, filename, conn_id)
+      → Trả về ngay: { run_id, status: "running" }
+    - Nếu không có run_id: chạy sync như cũ
+
+  3. Client nhận run_id → pollScriptStatus(run_id, pairs, index);
+     GET /api/scripts/run-status/<run_id> mỗi 200ms
+       ↓
+  app.py: api_script_run_status()
+    - Trả về status: "running" | "success" | "error" | "stopped"
+    - Khi xong: pop khỏi _script_runs, trả về result
+
+  4. Nếu status = "running" → tiếp tục poll
+  5. Nếu status = "success" → chạy script tiếp theo (index+1)
+  6. Nếu status = "error" → redirect với thông báo lỗi
+  Khi tất cả xong: redirect với message thành công
 ```
 
-Click tên job → xem lịch sử chi tiết của job đó.
+#### Worker chạy script (_run_one_script_with_stop)
+
+```
+_script_run_worker(run_id, filename, conn_id):
+       ↓
+_run_one_script_with_stop(filename, conn_id, stop_event):
+  1. Đọc file scripts/sql/<filename>
+  2. Parse SQL: split theo ";", bỏ dòng trống và comment (--)
+  3. Kết nối Oracle target (theo conn_id)
+  4. Với mỗi câu lệnh trong statements:
+     - Kiểm tra stop_event.is_set()
+       → Nếu set: rollback, return (filename, "Đã dừng theo yêu cầu.")
+     - cur.execute(stmt)
+  5. commit
+  6. add_script_run(filename, conn_id, conn_name, status, message)
+  7. Cập nhật state["status"], state["result"]
+```
+
+#### Dừng script đang chạy
+
+```
+Người dùng bấm "Dừng"
+       ↓
+POST /api/scripts/stop/<run_id>
+       ↓
+app.py: api_script_stop()
+  - state["stop"].set()
+  - Worker kiểm tra stop_event trước mỗi câu lệnh → thoát sớm
+```
+
+#### Chạy batch (form submit)
+
+```
+POST /scripts/run (form submit, nhiều script)
+  → Chạy tuần tự sync (không dùng run_id)
+  → _run_one_script() cho từng script
+  → Nếu lỗi: dừng ngay, redirect với message
+  → redirect_to: /scripts hoặc /scripts/run-delete-pn-lai-lichs
+```
+
+#### Các chức năng khác
+
+- **Tạo mới:** `POST /api/scripts/new` — tạo file .sql trong scripts/sql
+- **Đọc:** `GET /api/scripts/<filename>` — nội dung file
+- **Lưu:** `POST /api/scripts/<filename>` — ghi nội dung
+- **Xóa:** `DELETE /api/scripts/<filename>` — xóa file
+- **Ghi chú:** `POST /api/scripts/note` — lưu note vào scripts/sql_notes.json
 
 ---
 
@@ -338,6 +354,9 @@ Click tên job → xem lịch sử chi tiết của job đó.
 | `scripts/sync_config.xml` | XML | Danh sách kết nối Oracle (host, port, user, pass) |
 | `scripts/job_sync.csv` | CSV | Danh sách job: id, name, kết nối nguồn/đích, bảng, sql_text |
 | `scripts/job_his.xml` | XML | Lịch sử mỗi lần chạy job |
+| `scripts/job_delete_his.xml` | XML | Lịch sử câu lệnh DELETE đã thực thi |
+| `scripts/script_his.xml` | XML | Lịch sử chạy script .sql |
+| `scripts/sql_notes.json` | JSON | Ghi chú theo tên file script |
 
 **Không có database trung gian** — tất cả config và lịch sử lưu trong file.
 
@@ -366,12 +385,27 @@ id,name,source_connection_name,target_connection_name,source_table,target_table,
 | POST | `/job/create` | Tạo job + redirect sang mapping |
 | GET | `/job/<id>/them-moi` | Màn hình mapping cột |
 | POST | `/job/<id>/save` | Lưu câu lệnh SQL |
+| POST | `/api/job/<id>/sql` | Lưu SQL nhanh (inline edit) |
 | POST | `/job/<id>/delete` | Xóa 1 job |
 | POST | `/jobs/delete-bulk` | Xóa nhiều job |
 | GET | `/api/jobs/run-stream` | Chạy job (SSE real-time, đa luồng) |
-| POST | `/api/jobs/stop/<run_id>` | Dừng run đang chạy |
+| POST | `/api/jobs/stop/<run_id>` | Dừng run job đang chạy |
 | GET | `/jobs/errors` | Danh sách job lỗi gần nhất |
+| GET | `/jobs/stats-success` | Thống kê job chạy thành công |
+| GET | `/jobs/deleted-history` | Lịch sử câu lệnh DELETE |
 | GET | `/job/<id>/history` | Lịch sử chạy của 1 job |
+| GET | `/scripts` | Chạy script .sql |
+| POST | `/scripts/run` | Chạy script (form batch, sync) |
+| GET | `/scripts/history` | Lịch sử chạy script |
+| GET | `/scripts/run-delete-pn-lai-lichs` | Chạy JOB_DELETE_*.sql |
+| POST | `/api/scripts/new` | Tạo file script mới |
+| GET | `/api/scripts/<filename>` | Đọc nội dung file script |
+| POST | `/api/scripts/<filename>` | Lưu nội dung file script |
+| DELETE | `/api/scripts/<filename>` | Xóa file script |
+| POST | `/api/scripts/run-one` | Chạy 1 script (async nếu có run_id) |
+| GET | `/api/scripts/run-status/<run_id>` | Lấy trạng thái chạy script |
+| POST | `/api/scripts/stop/<run_id>` | Dừng script đang chạy |
+| POST | `/api/scripts/note` | Lưu ghi chú cho file script |
 
 ---
 
