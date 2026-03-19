@@ -345,7 +345,7 @@ Click tên job → xem lịch sử chi tiết của job đó.
 
 ```
 id,name,source_connection_name,target_connection_name,source_table,target_table,sql_text
-77,JOB_DM_MA_THOI_GIANS,QLPN_OLD,QLPN_NEW,MA_MUC_THOI_GIAN,DM_MA_THOI_GIANS,"INSERT INTO QLPN_NEW.DM_MA_THOI_GIANS (...) SELECT ... FROM QLPN_OLD.MA_MUC_THOI_GIAN"
+77,JOB_DM_MA_THOI_GIANS,QLPN_OLD,QLPN,MA_MUC_THOI_GIAN,DM_MA_THOI_GIANS,"INSERT INTO QLPN.DM_MA_THOI_GIANS (...) SELECT ... FROM QLPN_OLD.MA_MUC_THOI_GIAN"
 ```
 
 ---

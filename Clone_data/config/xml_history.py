@@ -105,3 +105,15 @@ def get_latest_errors() -> list:
     # Chỉ trả về những job có lần chạy gần nhất là lỗi
     errors = [r for r in latest.values() if r["status"] == "error"]
     return sorted(errors, key=lambda x: x["run_at"], reverse=True)
+
+
+def get_latest_successes() -> list:
+    """Lấy lần chạy gần nhất của mỗi job có status=success, kèm số dòng insert."""
+    _, root = _load_tree()
+    all_rows = [_node_to_dict(n) for n in root.findall("history")]
+    success_rows = [r for r in all_rows if r["status"] == "success"]
+    # Lấy lần chạy gần nhất của mỗi stmt_id (chỉ success)
+    latest: dict[int, dict] = {}
+    for row in sorted(success_rows, key=lambda x: x["run_at"]):
+        latest[row["stmt_id"]] = row
+    return sorted(latest.values(), key=lambda x: x["run_at"], reverse=True)

@@ -1,0 +1,1 @@
+docker cp ./scripts/. oracle-sync-app:/app/scripts/

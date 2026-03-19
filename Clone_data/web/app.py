@@ -35,7 +35,9 @@ from config.csv_statements import (
     delete_statement_csv,
     delete_statements_csv_bulk,
 )
-from config.xml_history import add_history, get_history_by_stmt, get_latest_errors
+from config.xml_history import add_history, get_history_by_stmt, get_latest_errors, get_latest_successes
+from config.xml_deleted import add_delete_op, get_all_delete_ops
+from config.xml_script_history import add_script_run, get_all_script_runs
 from src.metadata_loader import get_tables, get_columns
 
 app = Flask(
@@ -47,6 +49,9 @@ app = Flask(
 # run_id -> {"stop": threading.Event, "conns": dict[int, conn], "lock": Lock}
 _active_runs: dict = {}
 _history_lock = threading.Lock()   # bảo vệ ghi job_his.xml từ nhiều thread
+
+# script_run_id -> {"stop": Event, "status": str, "result": dict, "lock": Lock}
+_script_runs: dict = {}
 
 LARGE_TABLE_THRESHOLD = int(os.environ.get("LARGE_TABLE_THRESHOLD", 100_000))
 
@@ -118,6 +123,547 @@ def _get_connection_info(data: dict, cid: int) -> dict:
                 "password": c.get("password_enc") or "",
             }
     raise ValueError(f"Không tìm thấy kết nối id={cid}")
+
+
+def _scripts_dir() -> Path:
+    """Thư mục chứa các file .sql (mặc định: scripts/sql)."""
+    return _root / "scripts" / "sql"
+
+
+def _notes_file() -> Path:
+    """File lưu note theo tên script (scripts/sql_notes.json)."""
+    return _root / "scripts" / "sql_notes.json"
+
+
+def _load_notes() -> dict[str, str]:
+    """Đọc notes: { filename: note_text }."""
+    path = _notes_file()
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return dict(data) if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_note(filename: str, note: str) -> None:
+    """Lưu note cho 1 file."""
+    notes = _load_notes()
+    fn = filename.strip()
+    if not fn or not fn.endswith(".sql"):
+        raise ValueError("Tên file không hợp lệ.")
+    if note.strip():
+        notes[fn] = note.strip()
+    else:
+        notes.pop(fn, None)
+    path = _notes_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(notes, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _list_sql_files() -> list[dict]:
+    """Liệt kê các file .sql trong thư mục scripts (level 1).
+    Loại trừ JOB_DELETE_*.sql (có menu riêng). JOB_PN_LAI_LICHS.sql đứng đầu."""
+    scripts_path = _scripts_dir()
+    if not scripts_path.is_dir():
+        return []
+    items: list[dict] = []
+    for p in sorted(scripts_path.glob("*.sql")):
+        if p.name.startswith("JOB_DELETE_"):
+            continue
+        try:
+            stat = p.stat()
+            items.append({
+                "name": p.name,
+                "size": stat.st_size,
+                "mtime": stat.st_mtime,
+            })
+        except OSError:
+            continue
+    # JOB_PN_LAI_LICHS.sql đứng đầu
+    priority = ["JOB_PN_LAI_LICHS.sql"]
+    by_name = {it["name"]: it for it in items}
+    ordered: list[dict] = []
+    for p in priority:
+        if p in by_name:
+            ordered.append(by_name.pop(p))
+    for name in sorted(by_name.keys()):
+        ordered.append(by_name[name])
+    return ordered
+
+
+def _list_delete_scripts() -> list[dict]:
+    """Liệt kê các file JOB_DELETE_*.sql trong scripts/sql."""
+    scripts_path = _scripts_dir()
+    if not scripts_path.is_dir():
+        return []
+    items: list[dict] = []
+    for p in sorted(scripts_path.glob("JOB_DELETE_*.sql")):
+        try:
+            stat = p.stat()
+            items.append({"name": p.name, "size": stat.st_size, "mtime": stat.st_mtime})
+        except OSError:
+            continue
+    return items
+
+
+# --- Trang chạy script .sql ---
+@app.route("/scripts")
+def scripts_page():
+    message = request.args.get("message")
+    message_type = request.args.get("message_type", "success")
+    scripts = _list_sql_files()
+
+    connections = []
+    try:
+        data = load_connections_only()
+        for c in sorted(
+            [x for x in data.get("connections", []) if x.get("connection_type") == "target"],
+            key=lambda x: x.get("id", 0),
+        ):
+            connections.append(
+                {
+                    "id": c.get("id"),
+                    "name": c.get("name"),
+                }
+            )
+    except Exception as e:
+        message = f"Lỗi đọc kết nối: {e}"
+        message_type = "error"
+
+    notes_map = _load_notes()
+    return render_template(
+        "scripts.html",
+        active="scripts",
+        scripts=scripts,
+        connections=connections,
+        notes_map=notes_map,
+        message=message,
+        message_type=message_type,
+    )
+
+
+def _resolve_script_path(filename: str) -> Path | None:
+    """Trả về Path nếu file hợp lệ trong scripts/sql, None nếu không."""
+    fn = filename.strip()
+    if not fn or not fn.endswith(".sql"):
+        return None
+    scripts_path = _scripts_dir()
+    try:
+        scripts_path_resolved = scripts_path.resolve()
+    except FileNotFoundError:
+        return None
+    script_file = (scripts_path / fn).resolve()
+    if not str(script_file).startswith(str(scripts_path_resolved)):
+        return None
+    if not script_file.is_file():
+        return None
+    return script_file
+
+
+def _validate_new_filename(filename: str) -> tuple[Path | None, str | None]:
+    """Trả về (Path, None) nếu tên file hợp lệ để tạo mới, (None, error_msg) nếu không."""
+    fn = filename.strip()
+    if not fn:
+        return (None, "Tên file không được trống.")
+    if not fn.lower().endswith(".sql"):
+        return (None, "Tên file phải có đuôi .sql")
+    if "/" in fn or "\\" in fn or ".." in fn:
+        return (None, "Tên file không được chứa đường dẫn.")
+    scripts_path = _scripts_dir()
+    try:
+        scripts_path_resolved = scripts_path.resolve()
+    except FileNotFoundError:
+        return (None, "Thư mục scripts không tồn tại.")
+    script_file = (scripts_path / fn).resolve()
+    if not str(script_file).startswith(str(scripts_path_resolved)):
+        return (None, "Tên file không hợp lệ.")
+    if script_file.exists():
+        return (None, "File đã tồn tại.")
+    return (script_file, None)
+
+
+@app.route("/api/scripts/new", methods=["POST"])
+def api_script_new():
+    """Tạo file script mới."""
+    filename = request.form.get("filename", "").strip()
+    content = request.form.get("content", "")
+    if content is None:
+        content = ""
+    script_file, err = _validate_new_filename(filename)
+    if err:
+        return jsonify({"error": err}), 400
+    try:
+        script_file.write_text(content, encoding="utf-8")
+        return jsonify({"ok": True, "filename": filename})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/scripts/<path:filename>", methods=["GET"])
+def api_script_get(filename: str):
+    """Đọc nội dung file script."""
+    script_file = _resolve_script_path(filename)
+    if not script_file:
+        return jsonify({"error": "File không hợp lệ hoặc không tồn tại."}), 404
+    try:
+        content = script_file.read_text(encoding="utf-8")
+        return jsonify({"content": content})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/scripts/<path:filename>", methods=["DELETE"])
+def api_script_delete(filename: str):
+    """Xóa file script."""
+    script_file = _resolve_script_path(filename)
+    if not script_file:
+        return jsonify({"error": "File không hợp lệ hoặc không tồn tại."}), 404
+    try:
+        script_file.unlink()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/scripts/note", methods=["POST"])
+def api_script_note():
+    """Lưu note cho file script."""
+    filename = request.form.get("filename", "").strip()
+    note = request.form.get("note", "")
+    if note is None:
+        note = ""
+    if not filename or not filename.endswith(".sql"):
+        return jsonify({"error": "Tên file không hợp lệ."}), 400
+    if "/" in filename or "\\" in filename or ".." in filename:
+        return jsonify({"error": "Tên file không được chứa đường dẫn."}), 400
+    try:
+        _save_note(filename, note)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def _script_run_worker(run_id: str, filename: str, conn_id: int):
+    """Worker chạy script trong thread, có thể bị dừng."""
+    state = _script_runs.get(run_id)
+    if not state:
+        return
+    stop_evt = state["stop"]
+    err_fn, err_msg = _run_one_script_with_stop(filename, conn_id, stop_evt)
+    data = load_connections_only()
+    targets = [c for c in data.get("connections", []) if c.get("connection_type") == "target"]
+    conn_by_id = {c.get("id"): c for c in targets if c.get("id")}
+    conn_name = (conn_by_id.get(conn_id) or {}).get("name", "")
+    with state["lock"]:
+        if err_fn is None:
+            add_script_run(filename, conn_id, conn_name, "success", "")
+            state["status"] = "success"
+            state["result"] = {"ok": True, "filename": filename}
+        else:
+            status = "stopped" if (err_msg or "").startswith("Đã dừng") else "error"
+            if status == "error":
+                add_script_run(filename, conn_id, conn_name, "error", err_msg or "Lỗi không xác định.")
+            state["status"] = status
+            state["result"] = {"ok": False, "error": err_msg or "", "filename": filename}
+
+
+@app.route("/api/scripts/run-one", methods=["POST"])
+def api_script_run_one():
+    """Chạy 1 script. Nếu có run_id: chạy async, trả về ngay. Không có: chạy sync như cũ."""
+    filename = request.form.get("filename", "").strip()
+    conn_id = request.form.get("connection_id", type=int) or 0
+    run_id = request.form.get("run_id", "").strip()
+    if not filename:
+        return jsonify({"ok": False, "error": "Thiếu tên file."}), 400
+    if not conn_id:
+        return jsonify({"ok": False, "error": "Vui lòng chọn kết nối.", "filename": filename}), 400
+
+    if run_id:
+        stop_evt = threading.Event()
+        state = {"stop": stop_evt, "status": "running", "result": None, "lock": threading.Lock()}
+        _script_runs[run_id] = state
+        t = threading.Thread(target=_script_run_worker, args=(run_id, filename, conn_id))
+        t.daemon = True
+        t.start()
+        return jsonify({"run_id": run_id, "status": "running"})
+
+    err_fn, err_msg = _run_one_script(filename, conn_id)
+    data = load_connections_only()
+    targets = [c for c in data.get("connections", []) if c.get("connection_type") == "target"]
+    conn_by_id = {c.get("id"): c for c in targets if c.get("id")}
+    conn_name = (conn_by_id.get(conn_id) or {}).get("name", "")
+    if err_fn is None:
+        add_script_run(filename, conn_id, conn_name, "success", "")
+        return jsonify({"ok": True, "filename": filename})
+    add_script_run(filename, conn_id, conn_name, "error", err_msg or "Lỗi không xác định.")
+    return jsonify({"ok": False, "error": err_msg or "Lỗi không xác định.", "filename": filename}), 500
+
+
+@app.route("/api/scripts/run-status/<run_id>")
+def api_script_run_status(run_id: str):
+    """Lấy trạng thái chạy script."""
+    state = _script_runs.get(run_id)
+    if not state:
+        return jsonify({"status": "unknown"}), 404
+    with state["lock"]:
+        s = state["status"]
+        r = state.get("result")
+    if s in ("success", "error", "stopped"):
+        _script_runs.pop(run_id, None)
+        return jsonify({"status": s, "result": r})
+    return jsonify({"status": s})
+
+
+@app.route("/api/scripts/stop/<run_id>", methods=["POST"])
+def api_script_stop(run_id: str):
+    """Dừng script đang chạy."""
+    state = _script_runs.get(run_id)
+    if not state:
+        return jsonify({"ok": False, "error": "Không tìm thấy run_id."}), 404
+    state["stop"].set()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/scripts/<path:filename>", methods=["POST"])
+def api_script_save(filename: str):
+    """Lưu nội dung file script."""
+    script_file = _resolve_script_path(filename)
+    if not script_file:
+        return jsonify({"error": "File không hợp lệ hoặc không tồn tại."}), 404
+    content = request.form.get("content", request.get_data(as_text=True))
+    if content is None:
+        content = ""
+    try:
+        script_file.write_text(content, encoding="utf-8")
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def _run_one_script_with_stop(
+    filename: str, conn_id: int, stop_event: threading.Event
+) -> tuple[str | None, str | None]:
+    """Chạy 1 script, kiểm tra stop_event trước mỗi câu lệnh. Trả về (None, None) nếu thành công."""
+    data = load_connections_only()
+    targets = [c for c in data.get("connections", []) if c.get("connection_type") == "target"]
+    scripts_path = _scripts_dir()
+    script_file = (scripts_path / filename).resolve()
+    try:
+        scripts_path_resolved = scripts_path.resolve()
+    except FileNotFoundError:
+        return (filename, "Thư mục scripts không tồn tại.")
+    if not str(script_file).startswith(str(scripts_path_resolved)):
+        return (filename, "Đường dẫn file không hợp lệ.")
+    if not script_file.is_file() or script_file.suffix.lower() != ".sql":
+        return (filename, "File không tồn tại hoặc không phải .sql.")
+    try:
+        sql_text = script_file.read_text(encoding="utf-8")
+    except Exception as e:
+        return (filename, f"Lỗi đọc file: {e}")
+    if not sql_text.strip():
+        return (filename, "File script trống.")
+    statements: list[str] = []
+    for raw in re.split(r";\s*(?=$|\n)", sql_text, flags=re.MULTILINE):
+        stmt = []
+        for line in raw.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("--"):
+                continue
+            stmt.append(line)
+        joined = "\n".join(stmt).strip()
+        if joined:
+            statements.append(joined)
+    if not statements:
+        return (filename, "Không tìm thấy câu lệnh SQL hợp lệ.")
+    if not any(c.get("id") == conn_id for c in targets):
+        return (filename, "Chỉ được phép dùng kết nối loại target.")
+    try:
+        conn_info = _get_connection_info({"connections": targets}, conn_id)
+    except Exception as e:
+        return (filename, str(e))
+    try:
+        with oracledb.connect(
+            dsn=conn_info["dsn"],
+            user=conn_info["user"],
+            password=conn_info["password"],
+        ) as oc:
+            oc.autocommit = False
+            try:
+                with oc.cursor() as cur:
+                    for stmt in statements:
+                        if stop_event.is_set():
+                            try:
+                                oc.rollback()
+                            except Exception:
+                                pass
+                            return (filename, "Đã dừng theo yêu cầu.")
+                        cur.execute(stmt)
+                oc.commit()
+            except Exception:
+                try:
+                    oc.rollback()
+                except Exception:
+                    pass
+                raise
+        return (None, None)
+    except Exception as e:
+        return (filename, str(e))
+
+
+def _run_one_script(filename: str, conn_id: int) -> tuple[str | None, str | None]:
+    """Chạy 1 script. Trả về (None, None) nếu thành công, (filename, error_msg) nếu lỗi."""
+    data = load_connections_only()
+    targets = [c for c in data.get("connections", []) if c.get("connection_type") == "target"]
+    scripts_path = _scripts_dir()
+    script_file = (scripts_path / filename).resolve()
+    try:
+        scripts_path_resolved = scripts_path.resolve()
+    except FileNotFoundError:
+        return (filename, "Thư mục scripts không tồn tại.")
+    if not str(script_file).startswith(str(scripts_path_resolved)):
+        return (filename, "Đường dẫn file không hợp lệ.")
+    if not script_file.is_file() or script_file.suffix.lower() != ".sql":
+        return (filename, "File không tồn tại hoặc không phải .sql.")
+    try:
+        sql_text = script_file.read_text(encoding="utf-8")
+    except Exception as e:
+        return (filename, f"Lỗi đọc file: {e}")
+    if not sql_text.strip():
+        return (filename, "File script trống.")
+    statements: list[str] = []
+    for raw in re.split(r";\s*(?=$|\n)", sql_text, flags=re.MULTILINE):
+        stmt = []
+        for line in raw.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("--"):
+                continue
+            stmt.append(line)
+        joined = "\n".join(stmt).strip()
+        if joined:
+            statements.append(joined)
+    if not statements:
+        return (filename, "Không tìm thấy câu lệnh SQL hợp lệ.")
+    if not any(c.get("id") == conn_id for c in targets):
+        return (filename, "Chỉ được phép dùng kết nối loại target.")
+    try:
+        conn_info = _get_connection_info({"connections": targets}, conn_id)
+    except Exception as e:
+        return (filename, str(e))
+    try:
+        with oracledb.connect(
+            dsn=conn_info["dsn"],
+            user=conn_info["user"],
+            password=conn_info["password"],
+        ) as oc:
+            oc.autocommit = False
+            try:
+                with oc.cursor() as cur:
+                    for stmt in statements:
+                        cur.execute(stmt)
+                oc.commit()
+            except Exception:
+                try:
+                    oc.rollback()
+                except Exception:
+                    pass
+                raise
+        return (None, None)
+    except Exception as e:
+        return (filename, str(e))
+
+
+@app.route("/scripts/run", methods=["POST"])
+def scripts_run():
+    filenames = request.form.getlist("filename")
+    conn_ids_raw = request.form.getlist("connection_id")
+    conn_ids: list[int] = []
+    for v in conn_ids_raw:
+        try:
+            conn_ids.append(int(v))
+        except (ValueError, TypeError):
+            conn_ids.append(0)
+
+    if not filenames:
+        redirect_to = request.form.get("redirect", "").strip()
+        target = "scripts_run_delete_pn_lai_lichs" if redirect_to == "delete" else "scripts_page"
+        return redirect(url_for(target, message="Thiếu tên file script.", message_type="error"))
+
+    data = load_connections_only()
+    targets = [c for c in data.get("connections", []) if c.get("connection_type") == "target"]
+
+    success_count = 0
+    first_error: tuple[str, str] | None = None
+    conn_by_id = {c.get("id"): c for c in targets if c.get("id")}
+
+    for i, filename in enumerate(filenames):
+        fn = filename.strip()
+        if not fn:
+            continue
+        cid = conn_ids[i] if i < len(conn_ids) else (conn_ids[0] if conn_ids else 0)
+        if not cid:
+            add_script_run(fn, cid, conn_by_id.get(cid, {}).get("name", ""), "error", "Vui lòng chọn kết nối.")
+            first_error = (fn, "Vui lòng chọn kết nối.")
+            break
+        conn_name = (conn_by_id.get(cid) or {}).get("name", "")
+        err_fn, err_msg = _run_one_script(fn, cid)
+        if err_fn is None:
+            add_script_run(fn, cid, conn_name, "success", "")
+            success_count += 1
+        else:
+            add_script_run(fn, cid, conn_name, "error", err_msg or "Lỗi không xác định.")
+            first_error = (err_fn, err_msg or "Lỗi không xác định.")
+            break
+
+    redirect_to = request.form.get("redirect", "").strip()
+    target_route = "scripts_run_delete_pn_lai_lichs" if redirect_to == "delete" else "scripts_page"
+
+    if first_error:
+        return redirect(
+            url_for(
+                target_route,
+                message=f"Lỗi khi chạy {first_error[0]}: {first_error[1]}",
+                message_type="error",
+            )
+        )
+    total = len([f for f in filenames if f.strip()])
+    msg = f"Đã chạy {success_count} script." if total > 1 else f"Đã chạy script: {filenames[0].strip()}"
+    return redirect(url_for(target_route, message=msg, message_type="success"))
+
+
+@app.route("/scripts/history")
+def scripts_history():
+    rows = get_all_script_runs()
+    return render_template("script_history.html", active="scripts_history", rows=rows)
+
+
+@app.route("/scripts/run-delete-pn-lai-lichs")
+def scripts_run_delete_pn_lai_lichs():
+    """Danh sách job JOB_DELETE_*.sql, giao diện giống Chạy script SQL."""
+    scripts = _list_delete_scripts()
+    connections = []
+    try:
+        data = load_connections_only()
+        for c in sorted(
+            [x for x in data.get("connections", []) if x.get("connection_type") == "target"],
+            key=lambda x: x.get("id", 0),
+        ):
+            connections.append({"id": c.get("id"), "name": c.get("name")})
+    except Exception:
+        pass
+    notes_map = _load_notes()
+    message = request.args.get("message")
+    message_type = request.args.get("message_type", "success")
+    return render_template(
+        "run_delete_scripts.html",
+        active="scripts_run_delete_pn_lai_lichs",
+        scripts=scripts,
+        connections=connections,
+        notes_map=notes_map,
+        message=message,
+        message_type=message_type,
+    )
 
 
 # --- Trang chủ: Danh sách bảng cần đồng bộ ---
@@ -370,6 +916,7 @@ def jobs_run():
                     cur.execute(sql_delete)
                     deleted = cur.rowcount
                 conn.commit()
+                add_delete_op(sid, label, tgt_schema, target_table, sql_delete, deleted)
                 try:
                     inserted = _execute_insert(conn, sql_insert)
                     conn.commit()
@@ -462,6 +1009,8 @@ def jobs_run_stream():
                         cur.execute(sql_delete)
                         deleted = cur.rowcount
                     oc.commit()
+                    with _history_lock:
+                        add_delete_op(sid, label, tgt_schema, target_table, sql_delete, deleted)
 
                     # 2. INSERT (có thể chia chunk nếu > CHUNK_SIZE dòng)
                     def _insert_cb(total_rows, mode):
@@ -617,6 +1166,20 @@ def jobs_delete_bulk():
         return redirect(url_for("index", message=f"Đã xóa {len(stmt_ids)} job."))
     except Exception as e:
         return redirect(url_for("index", message=f"Lỗi: {e}", message_type="error"))
+
+
+# --- Thống kê bảng chạy thành công ---
+@app.route("/jobs/stats-success")
+def jobs_stats_success():
+    rows = get_latest_successes()
+    return render_template("job_stats_success.html", active="jobs_stats", rows=rows)
+
+
+# --- Lịch sử câu lệnh DELETE đã thực thi ---
+@app.route("/jobs/deleted-history")
+def jobs_deleted_history():
+    rows = get_all_delete_ops()
+    return render_template("job_deleted_history.html", active="jobs_deleted", rows=rows)
 
 
 if __name__ == "__main__":

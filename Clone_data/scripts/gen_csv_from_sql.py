@@ -10,7 +10,7 @@ SQL_FILE = Path(r'c:\Users\thangnd.ETC\Downloads\insert 126 bảng 1.sql')
 OUT_FILE = Path(__file__).parent / 'job_sync_import.csv'
 
 SRC_CONN = 'QLPN_OLD'
-TGT_CONN = 'QLPN_NEW'
+TGT_CONN = 'QLPN'
 
 FIELDNAMES = ['id', 'name', 'source_connection_name', 'target_connection_name',
               'source_table', 'target_table', 'sql_text']

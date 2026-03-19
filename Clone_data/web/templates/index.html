@@ -13,7 +13,8 @@
                 display: inline; vertical-align: middle; margin-left: 2px; }
     .his-icon:hover { color: #1976d2; }
     .sql-empty { font-size: 12px; color: #bbb; font-style: italic; }
-    .sql-wrap { display:inline-flex; align-items:center; gap:4px; max-width:320px; }
+    .sql-wrap { display:inline-flex; align-items:center; gap:4px; max-width:320px; position:relative; }
+    .sql-copy-source { position:absolute; left:-9999px; width:1px; height:1px; opacity:0; pointer-events:none; }
     .sql-preview { font-family: 'Courier New', monospace; font-size: 11px; color: #546e7a;
                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                    flex:1; min-width:0; }
@@ -132,10 +133,9 @@
             <td>
               {% if r.sql_text %}
               <div class="sql-wrap">
-                <span class="sql-preview" title="{{ r.sql_text }}">{{ r.sql_text }}</span>
-                <button type="button" class="btn-copy-sql"
-                  data-sql="{{ r.sql_text | e }}"
-                  onclick="copySql(this)">Copy</button>
+                <span class="sql-preview" title="{{ r.sql_text | e }}">{{ r.sql_text }}</span>
+                <textarea class="sql-copy-source" readonly aria-hidden="true">{{ r.sql_text }}</textarea>
+                <button type="button" class="btn-copy-sql" onclick="copySql(this)">Copy</button>
               </div>
               {% else %}
                 <span class="sql-empty">— chưa có câu lệnh</span>
@@ -351,24 +351,42 @@
     });
 
     function copySql(btn) {
-      const sql = btn.dataset.sql;
-      navigator.clipboard.writeText(sql).then(function() {
+      const wrap = btn.closest('.sql-wrap');
+      const ta = wrap ? wrap.querySelector('.sql-copy-source') : null;
+      const sql = ta ? ta.value : (btn.dataset.sql || '');
+      if (!sql) { alert('Không có nội dung để copy.'); return; }
+      function onOk() {
         btn.textContent = 'Copied!';
         btn.classList.add('copied');
         setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
-      }).catch(function() {
-        // fallback cho trình duyệt không hỗ trợ clipboard API
-        const ta = document.createElement('textarea');
-        ta.value = sql;
-        ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(sql).then(onOk).catch(function() {
+          fallbackCopy(sql, onOk);
+        });
+      } else {
+        fallbackCopy(sql, onOk);
+      }
+    }
+    function fallbackCopy(sql, onOk) {
+      const temp = document.createElement('textarea');
+      temp.value = sql;
+      temp.style.position = 'fixed';
+      temp.style.left = '0';
+      temp.style.top = '0';
+      temp.style.opacity = '0';
+      temp.style.width = '2em';
+      temp.style.height = '2em';
+      document.body.appendChild(temp);
+      temp.focus();
+      temp.select();
+      try {
         document.execCommand('copy');
-        document.body.removeChild(ta);
-        btn.textContent = 'Copied!';
-        btn.classList.add('copied');
-        setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
-      });
+        onOk();
+      } catch (e) {
+        alert('Copy thất bại. Vui lòng chọn và copy thủ công.');
+      }
+      document.body.removeChild(temp);
     }
 
     function getChecked() {
