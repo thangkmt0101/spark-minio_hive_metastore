@@ -1,83 +1,46 @@
 DELETE FROM QLPN.CHUA_BENH_BAT_BUOCS;
-
-INSERT INTO QLPN.CHUA_BENH_BAT_BUOCS
-
-
-
-(PHAM_NHAN_ID, SO_QUYET_DINH, NGAY_QUYET_DINH, CO_QUAN_QUYET_DINH_ID, DIA_PHUONG_QUYET_DINH_ID, THOI_HAN, TU_NGAY
-
-
-
-, BENH_TAT_ID, CHI_TIET_BENH, NGAY_BAT_DAU, NGAY_KET_THUC, NOI_CHUA_BENH, CREATION_TIME, IS_DELETED)
-
-
-
-SELECT pll.ID_MOI AS PN_ID, QD_SO, QD_NGAY, dcq.ID AS MA_CQ_TOA_AN_QD, ddvhc.ID AS MA_DP_TOA_AN_QD
-
-
-
-, dmtg.ID AS MA_MUC_THOI_HAN, TU_NGAY, dbt.ID AS MA_BENH_TAT, BENH_TAT, NGAY_BAT_DAU, NGAY_KET_THUC, NOI_CHUA_BENH
-
-
-
-,sysdate as CREATION_TIME,0 as IS_DELETED
-
-
-
-FROM QLPN_OLD.PN_CHUA_BENH_BAT_BUOC cbbb
-
-
-
-LEFT JOIN (SELECT lln.ID AS ID_MOI
-
-
-
-, llo.PN_ID AS ID_CU
-
-
-
-FROM QLPN_OLD.PN_LAI_LICH llo
-
-
-
-LEFT JOIN QLPN.PN_LAI_LICHS lln
-
-
-
-ON lln.LL_SO_HO_SO_LAN_DAU = llo.SO_HSLD) pll
-
-
-
-ON cbbb.PN_ID = pll.ID_CU 
-
-
-
-LEFT JOIN QLPN.DM_CO_QUANS dcq
-
-
-
-ON cbbb.MA_CQ_TOA_AN_QD = dcq.CQ_MA
-
-
-
-LEFT JOIN QLPN.DM_DON_VI_HANH_CHINH ddvhc
-
-
-
-ON cbbb.MA_DP_TOA_AN_QD = ddvhc.DVHC_MA_DVHC
-
-
-
-LEFT JOIN QLPN.DM_BENH_TATS dbt
-
-
-
-ON cbbb.MA_BENH_TAT = dbt.BT_MA
-
-
-
-LEFT JOIN QLPN.DM_MA_THOI_GIANS dmtg 
-
-
-
-ON cbbb.MA_MUC_THOI_HAN = dmtg.MTG_MA
+    INSERT INTO qlpn.chua_benh_bat_buocs (
+        pham_nhan_id,
+        so_quyet_dinh,
+        ngay_quyet_dinh,
+        co_quan_quyet_dinh_id,
+        dia_phuong_quyet_dinh_id,
+        thoi_han,
+        tu_ngay,
+        benh_tat_id,
+        chi_tiet_benh,
+        ngay_bat_dau,
+        ngay_ket_thuc,
+        noi_chua_benh,
+        creation_time,
+        is_deleted
+    )
+        SELECT
+            pll.id_moi AS pn_id,
+            qd_so,
+            qd_ngay,
+            dcq.id     AS ma_cq_toa_an_qd,
+            ddvhc.id   AS ma_dp_toa_an_qd,
+            dmtg.id    AS ma_muc_thoi_han,
+            tu_ngay,
+            dbt.id     AS ma_benh_tat,
+            benh_tat,
+            ngay_bat_dau,
+            ngay_ket_thuc,
+            noi_chua_benh,
+            sysdate    AS creation_time,
+            0          AS is_deleted
+        FROM
+            qlpn_old.pn_chua_benh_bat_buoc cbbb
+            LEFT JOIN (
+                SELECT
+                    lln.id    AS id_moi,
+                    llo.pn_id AS id_cu
+                FROM
+                    qlpn_old.pn_lai_lich llo
+                    LEFT JOIN qlpn.pn_lai_lichs    lln ON lln.ll_so_ho_so_lan_dau = llo.so_hsld
+            )                              pll ON cbbb.pn_id = pll.id_cu
+            LEFT JOIN qlpn.dm_co_quans               dcq ON cbbb.ma_cq_toa_an_qd = dcq.cq_ma
+            LEFT JOIN qlpn.dm_don_vi_hanh_chinh      ddvhc ON cbbb.ma_dp_toa_an_qd = ddvhc.dvhc_ma_dvhc
+            LEFT JOIN qlpn.dm_benh_tats              dbt ON cbbb.ma_benh_tat = dbt.bt_ma
+            LEFT JOIN qlpn.dm_ma_thoi_gians          dmtg ON cbbb.ma_muc_thoi_han = dmtg.mtg_ma;

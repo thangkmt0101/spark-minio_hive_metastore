@@ -16,8 +16,8 @@
       <host>192.168.1.102</host>
       <port>1521</port>
       <service_name>pdb1.localdomain</service_name>
-      <username>QLPN_NEW</username>
-      <password_enc>QLPN_NEW</password_enc>
+      <username>QLPN</username>
+      <password_enc>Etc1234</password_enc>
     </connection>
   </connections>
   <jobs />

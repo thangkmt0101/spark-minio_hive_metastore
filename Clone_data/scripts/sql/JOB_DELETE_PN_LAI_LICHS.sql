@@ -1,120 +1,139 @@
--- ===== NHÓM CHI TIẾT / PHỤ THUỘC =====
-
-DELETE FROM QLPN.BIEN_BAN_GHI_NHANS;
-DELETE FROM QLPN.CHUA_BENH_BAT_BUOCS;
-DELETE FROM QLPN.DX_DU_DIEU_KIEN_DAC_XAS;
-DELETE FROM QLPN.DX_HINH_PHAT_BO_SUNGS;
-DELETE FROM QLPN.DX_THOI_GIAN_CHAP_HANHS;
-DELETE FROM QLPN.DX_THOI_GIAN_CON_LAIES;
-DELETE FROM QLPN.DX_TOI_DANH_RIENGS;
-DELETE FROM QLPN.DX_TRUONG_HOP_DAC_BIETS;
-DELETE FROM QLPN.DX_XEP_LOAI_CAI_TAOS;
-DELETE FROM QLPN.GTH_HINH_PHAT_BO_SUNGS;
-DELETE FROM QLPN.GTH_KY_GIAM_THOI_HANS;
-DELETE FROM QLPN.GTH_THOI_GIAN_CHAP_HANHS;
-DELETE FROM QLPN.GTH_TRUONG_HOP_DAC_BIETS;
-DELETE FROM QLPN.GTH_XEP_LOAI_CAI_TAOS;
-
-
-
-
-
--- KỲ XẾP LOẠI CẢI TẠO
-
-DELETE FROM QLPN.MO_KY_XEP_LOAI_CAI_TAO_PN_LAI_LICH;
-DELETE FROM QLPN.MO_KY_XEP_LOAI_CAI_TAOS;
-
-
-
--- ===== NHÓM NGHIỆP VỤ =====
-
-DELETE FROM QLPN.PN_DU_DIEU_KIEN_XET_THAS;
-DELETE FROM QLPN.PN_DOT_THA_CO_DIEU_KIENS;
-
-
-
-
-
-DELETE FROM QLPN.GIAM_THOI_HANS;
-DELETE FROM QLPN.HOAN_THI_HANH_ANS;
-DELETE FROM QLPN.KHEN_THUONGS;
-DELETE FROM QLPN.MIEN_HINH_PHATS;
-DELETE FROM QLPN.TRON_TRAIS;
-DELETE FROM QLPN.TRICH_XUATS;
-DELETE FROM QLPN.PN_KET_THUC_CHETS;
-DELETE FROM QLPN.PN_KET_THUC_RA_TRAIS;
-DELETE FROM QLPN.PN_GIAM_RIENGS;
-DELETE FROM QLPN.PN_DAC_XAS;
-
-DELETE FROM QLPN.PN_CHUYEN_GIAO;
-
-DELETE FROM QLPN.PN_BAN_AN_KHACS;
-
-DELETE FROM QLPN.PN_SUC_KHOES;
-
-
-
-
-
--- ===== NHÓM PHẠM NHÂN (ĐÚNG ERD) =====
-
-DELETE FROM QLPN.PHAM_NHAN_CHUYEN_TRAI;
-
-DELETE FROM QLPN.PHAM_NHAN_PHAN_DOI;
-
-DELETE FROM QLPN.PHAM_NHAN_PHAN_BUONG;
-
-DELETE FROM QLPN.PN_NGHIEN_MT;
-
-DELETE FROM QLPN.PN_NHAN_DANGS;
-
-DELETE FROM QLPN.PN_QUYET_DINH_BAN_AN_KHACS;
-
-DELETE FROM QLPN.PN_TAI_LIEU_DINH_KEMS;
-
-DELETE FROM QLPN.PN_THI_HANH_AN;
-
-DELETE FROM QLPN.PN_TIEN_AN;
-
-DELETE FROM QLPN.PN_TIEN_SUS;
-
-DELETE FROM QLPN.TAM_DINH_CHIS;
-
-DELETE FROM QLPN.NOP_LUUS;
-
-DELETE FROM QLPN.XEP_LOAIS;
-
-DELETE FROM QLPN.THA_CO_DIEU_KIENS;
-
-DELETE FROM QLPN.THAN_NHAN_CON_CAIS;
-
-DELETE FROM QLPN.THAN_NHAN_NGUOI_THANS;
-
-DELETE FROM QLPN.CHUA_BENH_BAT_BUOCS;
-
-DELETE FROM QLPN.PN_HINH_PHAT_BO_SUNGS;
-
-
-
-
-
-DELETE FROM QLPN.PN_LAI_LICHS;
-
-
-
--- Đặc Xá 
-
-DELETE FROM QLPN.DX_DIEU_KIEN_DAC_XAS;
-
-DELETE FROM QLPN.PN_DOT_DAC_XAS;
-
-
-
--- GIẢM THỜI HẠN
-
-DELETE FROM QLPN.GTH_DIEU_KIEN_GIAM_THOI_HANS;
-
-DELETE FROM QLPN.PN_GIAO_NHAN_PHAN_NHANS;
-DELETE FROM QLPN.DM_BUONG_GIAMS;
-DELETE FROM QLPN.DOT_QUYET_DINH_TRCH_XUATS;
-
+-- ===== NHÓM CHI TIẾT / PHỤ THUỘC =====
+
+
+DELETE FROM qlpn.bien_ban_ghi_nhans;
+
+DELETE FROM qlpn.chua_benh_bat_buocs;
+
+DELETE FROM qlpn.dx_du_dieu_kien_dac_xas;
+
+DELETE FROM qlpn.dx_hinh_phat_bo_sungs;
+
+DELETE FROM qlpn.dx_thoi_gian_chap_hanhs;
+
+DELETE FROM qlpn.dx_thoi_gian_con_laies;
+
+DELETE FROM qlpn.dx_toi_danh_riengs;
+
+DELETE FROM qlpn.dx_truong_hop_dac_biets;
+
+DELETE FROM qlpn.dx_xep_loai_cai_taos;
+
+DELETE FROM qlpn.gth_hinh_phat_bo_sungs;
+
+DELETE FROM qlpn.gth_ky_giam_thoi_hans;
+
+DELETE FROM qlpn.gth_thoi_gian_chap_hanhs;
+
+DELETE FROM qlpn.gth_truong_hop_dac_biets;
+
+DELETE FROM qlpn.gth_xep_loai_cai_taos;
+
+
+-- KỲ XẾP LOẠI CẢI TẠO
+
+
+DELETE FROM qlpn.mo_ky_xep_loai_cai_tao_pn_lai_lich;
+
+DELETE FROM qlpn.mo_ky_xep_loai_cai_taos;
+
+
+-- ===== NHÓM NGHIỆP VỤ =====
+
+
+
+DELETE FROM qlpn.pn_du_dieu_kien_xet_thas;
+
+DELETE FROM qlpn.pn_dot_tha_co_dieu_kiens;
+
+DELETE FROM qlpn.giam_thoi_hans;
+
+DELETE FROM qlpn.hoan_thi_hanh_ans;
+
+DELETE FROM qlpn.khen_thuongs;
+
+DELETE FROM qlpn.mien_hinh_phats;
+
+DELETE FROM qlpn.tron_trais;
+
+DELETE FROM qlpn.trich_xuats;
+
+DELETE FROM qlpn.pn_ket_thuc_chets;
+
+DELETE FROM qlpn.pn_ket_thuc_ra_trais;
+
+DELETE FROM qlpn.pn_giam_riengs;
+
+DELETE FROM qlpn.pn_dac_xas;
+
+DELETE FROM qlpn.pn_chuyen_giao;
+
+DELETE FROM qlpn.pn_ban_an_khacs;
+
+DELETE FROM qlpn.pn_suc_khoes;
+
+-- ===== NHÓM PHẠM NHÂN (ĐÚNG ERD) =====
+
+
+DELETE FROM qlpn.pham_nhan_chuyen_trai;
+
+DELETE FROM qlpn.pham_nhan_phan_doi;
+
+DELETE FROM qlpn.pham_nhan_phan_buong;
+
+DELETE FROM qlpn.pn_nghien_mt;
+
+DELETE FROM qlpn.pn_nhan_dangs;
+
+DELETE FROM qlpn.pn_quyet_dinh_ban_an_khacs;
+
+DELETE FROM qlpn.pn_tai_lieu_dinh_kems;
+
+DELETE FROM qlpn.pn_thi_hanh_an;
+
+DELETE FROM qlpn.pn_tien_an;
+
+DELETE FROM qlpn.pn_tien_sus;
+
+DELETE FROM qlpn.tam_dinh_chis;
+
+DELETE FROM qlpn.nop_luus;
+
+DELETE FROM qlpn.xep_loais;
+
+DELETE FROM qlpn.tha_co_dieu_kiens;
+
+DELETE FROM qlpn.than_nhan_con_cais;
+
+DELETE FROM qlpn.than_nhan_nguoi_thans;
+
+DELETE FROM qlpn.chua_benh_bat_buocs;
+
+DELETE FROM qlpn.pn_hinh_phat_bo_sungs;
+
+DELETE FROM qlpn.pn_lai_lichs;
+
+
+-- Đặc Xá 
+
+
+DELETE FROM qlpn.dx_dieu_kien_dac_xas;
+DELETE FROM qlpn.pn_dot_dac_xas;
+
+
+
+-- GIẢM THỜI HẠN
+
+
+DELETE FROM qlpn.gth_dieu_kien_giam_thoi_hans;
+
+DELETE FROM qlpn.pn_giao_nhan_phan_nhans;
+
+DELETE FROM qlpn.dm_buong_giams;
+
+DELETE FROM qlpn.dot_quyet_dinh_trch_xuats;
+
+-- CREATE GLOBAL TEMPORARY TABLE qlpn.tmp_pn_bb_map (
+--     old_id VARCHAR2(12),
+--     new_id NUMBER
+-- ) ON COMMIT PRESERVE ROWS;

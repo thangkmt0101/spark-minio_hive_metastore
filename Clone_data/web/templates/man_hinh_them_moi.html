@@ -464,6 +464,7 @@
         var out  = document.getElementById('sqlOutput');
         if (!rows.length) {
           out.textContent = '-- Thêm mapping để tạo câu lệnh SQL';
+          out.dataset.insertSql = '';
           out.classList.add('empty'); return;
         }
         var tgtList = [], srcList = [];
@@ -473,8 +474,14 @@
         });
         var tgtFull = targetConnName ? targetConnName + '.' + targetTable : targetTable;
         var srcFull = sourceConnName ? sourceConnName + '.' + sourceTable : sourceTable;
-        var sql = 'INSERT INTO ' + tgtFull + ' (' + tgtList.join(', ') + ') SELECT ' + srcList.join(', ') + ' FROM ' + srcFull + ';';
-        out.textContent = sql;
+        var insertSql = 'INSERT INTO ' + tgtFull + ' (' + tgtList.join(', ') + ') SELECT ' + srcList.join(', ') + ' FROM ' + srcFull + ';';
+        var fullSql = insertSql;
+        if (targetTable && targetConnName) {
+          var deleteSql = 'DELETE FROM ' + tgtFull + ';';
+          fullSql = deleteSql + '\n\n' + insertSql;
+        }
+        out.textContent = fullSql;
+        out.dataset.insertSql = insertSql;
         out.classList.remove('empty');
       }
 
@@ -490,19 +497,38 @@
       });
 
       document.getElementById('btnCopySql').addEventListener('click', function(){
-        var sql = document.getElementById('sqlOutput').textContent;
-        if (sql.startsWith('--')) return;
-        navigator.clipboard.writeText(sql).then(function(){
-          var btn = document.getElementById('btnCopySql');
-          var orig = btn.innerHTML;
+        var sql = document.getElementById('sqlOutput').textContent.trim();
+        if (!sql || sql.startsWith('--')) { alert('Chưa có câu lệnh SQL để copy.'); return; }
+        var btn = document.getElementById('btnCopySql');
+        var orig = btn.innerHTML;
+        function onOk() {
           btn.innerHTML = '&#10003; Copied!';
           btn.style.color = '#3fb950';
           setTimeout(function(){ btn.innerHTML = orig; btn.style.color = ''; }, 1600);
-        });
+        }
+        function fallbackCopy() {
+          var ta = document.createElement('textarea');
+          ta.value = sql;
+          ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0;width:2em;height:2em;';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          try {
+            if (document.execCommand('copy')) onOk();
+            else alert('Copy thất bại. Vui lòng chọn và copy thủ công (Ctrl+C).');
+          } catch (e) { alert('Copy thất bại. Vui lòng chọn và copy thủ công (Ctrl+C).'); }
+          document.body.removeChild(ta);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(sql).then(onOk).catch(fallbackCopy);
+        } else {
+          fallbackCopy();
+        }
       });
 
       document.getElementById('btnSaveStmt').addEventListener('click', function(){
-        var sql = document.getElementById('sqlOutput').textContent;
+        var out = document.getElementById('sqlOutput');
+        var sql = out.dataset.insertSql || out.textContent;
         if (!sql || sql.startsWith('--')) { alert('Chưa có câu lệnh SQL để lưu.'); return; }
         document.getElementById('saveStmtSql').value = sql;
         document.getElementById('saveStmtForm').submit();
