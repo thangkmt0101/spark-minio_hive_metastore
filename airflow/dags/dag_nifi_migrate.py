@@ -1,14 +1,11 @@
-import os
-import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from airflow import DAG
 from airflow.providers.standard.operators.python import PythonOperator
 from common.nifi_tasks import NifiTasks
 from common.sensors import WaitJobNiFiSensor
 
-POSTGRES_CONN_ID = "conn_postgresql_migrate"
-process_group_id = "45aba4e9-019c-1000-fe7a-ad0b7784d4df"
-dag_name = 'nifi_migrate_etl'
+process_group_id = "d206c9fa-019c-1000-0000-000074ce0335"
+dag_name = "nifi_migrate_etl"
 
 default_args = {
     'owner': 'airflow',
@@ -18,47 +15,24 @@ default_args = {
 dag = DAG(
     dag_id=dag_name,  # khai báo id
     default_args=default_args,
-    description="DAG chạy NiFi qua API, kiểm soát theo run_count trong bảng etl_table_migrate",
+    description="NiFi qua API (mTLS): stop trước nếu cần → start PG → chờ idle (status) → stop PG",
     catchup=False,  # không chạy lại các task đã chạy trong quá khứ
     schedule='44 08 * * *',  # lịch chạy (03:45 mỗi ngày)
     tags=['nifi_etl'],
 )
 
-# Khởi tạo instance của NifiTasks
-nifi_tasks = NifiTasks(postgres_conn_id=POSTGRES_CONN_ID)
-
-def check_run_count_start(**context):
-    """
-    Kiểm tra run_count yêu cầu = 1 trước khi start NiFi.
-    Lưu run_count vào XCom với key 'run_count_start'.
-    """
-    run_count = nifi_tasks.get_run_count_start(process_group_id, **context)
-    context["ti"].xcom_push(key="run_count_start", value=run_count)
-    print('check_run_count_start: ', run_count)
-    nifi_tasks.update_status_run_count_start(process_group_id, **context)
-    return run_count
+nifi_tasks = NifiTasks()
 
 def start_nifi_job_task(**context):
     return nifi_tasks.start_nifi_job(process_group_id, **context)
 
 def stop_nifi_job_task(**context):
     return nifi_tasks.stop_nifi_job(process_group_id, **context)
-    
-def check_stop_nifi_job_task(**context):
-    return nifi_tasks.stop_nifi_job(process_group_id, **context)
 
 
-# 0. Check run_count = 1 và lưu XCom
 task_check_stop_nifi_job_task = PythonOperator(
     task_id="check_stop_nifi_job_task",
-    python_callable=check_stop_nifi_job_task,
-    dag=dag,
-)
-    
-# 0. Check run_count = 1 và lưu XCom
-task_check_run_count_start = PythonOperator(
-    task_id="check_run_count_start",
-    python_callable=check_run_count_start,
+    python_callable=stop_nifi_job_task,
     dag=dag,
 )
 
@@ -69,15 +43,12 @@ task_start_nifi = PythonOperator(
     dag=dag,
 )
 
-# 2. Wait job NiFi (chờ run_count tăng lên)
+# 2. Wait job NiFi — chờ snapshot rảnh (activeThreadCount=0, queuedCount=0)
 task_wait_job_nifi = WaitJobNiFiSensor(
     task_id="wait_job_nifi",
     process_group_id=process_group_id,
-    target_task_id="check_run_count_start",
-    xcom_key="run_count_start",
-    postgres_conn_id=POSTGRES_CONN_ID,
-    poke_interval=15,  # Check mỗi 30 giây
-    timeout=60 * 60,  # Timeout 1 giờ
+    poke_interval=15,
+    timeout=60 * 60,
     mode="reschedule",
     dag=dag,
 )
@@ -89,7 +60,6 @@ task_stop_nifi = PythonOperator(
     dag=dag,
 )
 
-# Thiết lập dependencies: check -> start -> wait -> stop
-task_check_stop_nifi_job_task >> task_check_run_count_start >> task_start_nifi >> task_wait_job_nifi >> task_stop_nifi
+task_check_stop_nifi_job_task >> task_start_nifi >> task_wait_job_nifi >> task_stop_nifi
 
 
