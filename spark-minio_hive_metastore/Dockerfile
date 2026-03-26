@@ -22,6 +22,15 @@ RUN wget https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc
 # Tạo thư mục cho project
 WORKDIR /app
 
+# Import root CA vào Java truststore để JVM tin cert nội bộ
+COPY config/csdlgt-root-ca.crt csdlgt-root-ca.crt
+RUN export JAVA_HOME=/opt/java/openjdk && \
+    keytool -importcert -noprompt \
+      -alias csdlgt-root-ca \
+      -keystore "$JAVA_HOME/lib/security/cacerts" \
+      -storepass changeit \
+      -file csdlgt-root-ca.crt
+
 # Copy requirements và cài đặt Python packages
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
@@ -53,7 +62,7 @@ RUN chmod +x /app/spark-iceberg-etl.sh
 
 # Setup MinIO alias và kiểm tra đường dẫn (chạy khi build, có thể fail nếu MinIO chưa sẵn sàng)
 # Lưu ý: Command này có thể fail khi build nếu MinIO chưa accessible, nhưng không ảnh hưởng đến image
-RUN bash -c "mc alias set myminio http://10.8.75.82:9000 minioadmin minioadmin && mc ls myminio/csdlgt/staging_etl_data_export/" || echo "Warning: MinIO setup skipped (MinIO may not be available during build)"
+RUN bash -c "mc --insecure alias set myminio https://10.110.33.32:9000 minioadmin 'ZWBaAP_qiHW0!}]Q' && mc ls myminio/csdlgt/staging_etl_data_export/" || echo "Warning: MinIO setup skipped (MinIO may not be available during build)"
 
 # Giữ container chạy và chờ được gọi
 # Khi cần chạy job, sử dụng: docker exec <container_name> /app/entrypoint.sh /app/jobs/main.py <job_type>

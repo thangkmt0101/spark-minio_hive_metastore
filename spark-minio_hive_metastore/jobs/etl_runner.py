@@ -189,7 +189,7 @@ class Etl_Runner:
             date_list: Danh sách ngày dạng chuỗi yyyy-mm-dd; nếu truyền sẽ chạy tuần tự trong một Spark session
         """
 
-        self.spark = SparkSessionBuilder.get_spark("Daily Revenue Job")
+        self.spark = SparkSessionBuilder.get_spark("Daily Transformation Job")
 
         dates_to_process = date_list if date_list else [input_date]
         if not dates_to_process:
@@ -558,7 +558,7 @@ class Etl_Runner:
                             print(f"\n[SYNC] Đang sync dữ liệu từ MinIO cho table: {table_name}")
                             EtlUtils.sync_from_minio(
                                 source_path=ETL_DATA_EXPORT_PATH, 
-                                dest_path="/data/etl_data_export", 
+                                dest_path="/app/data", 
                                 input_date=current_date,
                                 table_name=table_name
                             )
@@ -573,7 +573,7 @@ class Etl_Runner:
                                 source_path=ETL_DATA_EXPORT_PATH,
                                 table_name=table_name,
                                 input_date=current_date,
-                                days_before=3
+                                days_before=30
                             )
                         except Exception as delete_err:
                             # Chỉ in warning, không log vào DB (không quan trọng)

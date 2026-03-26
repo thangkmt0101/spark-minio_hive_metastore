@@ -1,3 +1,4 @@
+import os
 from pyspark.sql import SparkSession
 from config.settings import (
     MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY,
@@ -12,6 +13,9 @@ class SparkSessionBuilder:
 
     @staticmethod
     def get_spark(app_name: str = "Spark Iceberg Hive Metastore"):
+        driver_host = os.getenv("SPARK_DRIVER_HOST")
+        driver_bind_address = os.getenv("SPARK_DRIVER_BIND_ADDRESS")
+
         spark = (
             SparkSession.builder
                 .appName(app_name)
@@ -41,13 +45,15 @@ class SparkSessionBuilder:
                 
                 # Network và timeout settings để tránh treo job
                 # Tăng timeout để xử lý shuffle và operations lớn
+                .config("spark.driver.host", driver_host)
+                .config("spark.driver.bindAddress", driver_bind_address)
+                .config("spark.driver.port", os.getenv("SPARK_DRIVER_PORT", "42315"))
+                .config("spark.blockManager.port", os.getenv("SPARK_BLOCKMANAGER_PORT", "42316"))
                 .config("spark.network.timeout", "600s")  # Timeout cho network operations (10 phút)
                 .config("spark.executor.heartbeatInterval", "30s")  # Heartbeat interval cho executor
                 .config("spark.executor.heartbeatTimeout", "600s")  # Timeout cho executor heartbeat (10 phút) - phải >= network.timeout
                 .config("spark.sql.execution.timeout", "600")  # Timeout cho SQL execution (10 phút)
-                # LƯU Ý: Các config về executor failures đã được set ở entrypoint.sh (spark-submit level)
-                # Không cần set lại ở đây vì config ở spark-submit sẽ override config ở SparkSession
-                .config("spark.stage.maxConsecutiveAttempts", "4")  # Số lần stage có thể retry liên tiếp
+
                 # Shuffle timeout settings để tránh treo ở shuffle operations
                 .config("spark.shuffle.io.connectionTimeout", "300s")  # Timeout cho shuffle connections (5 phút)
                 .config("spark.shuffle.io.retryWait", "10s")  # Thời gian chờ giữa các retry khi shuffle fail
@@ -108,10 +114,31 @@ class SparkSessionBuilder:
                 .config("spark.hadoop.fs.s3a.secret.key", MINIO_SECRET_KEY)
                 .config("spark.hadoop.fs.s3a.endpoint", MINIO_ENDPOINT)
                 .config("spark.hadoop.fs.s3a.path.style.access", "true")
-                .config("spark.hadoop.fs.s3a.connection.ssl.enabled", MINIO_SSL.lower() != "true")
+                .config("spark.hadoop.fs.s3a.connection.ssl.enabled","true")
                 .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
                 .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
                 .getOrCreate()
         )
+        
+        print(f"[SPARK SESSION] SparkSession created successfully: {app_name}")
+
+        # try:
+        #     # Thử liệt kê các bảng trong catalog Iceberg
+        #     print("--- Đang kiểm tra kết nối MinIO qua Iceberg Catalog ---")
+        #     spark.sql("SHOW NAMESPACES IN ice").show()
+        #     print("=> Kết nối Iceberg Catalog (Hive Metastore) THÀNH CÔNG.")
+
+        #     # Thử tạo một metadata file nhỏ hoặc kiểm tra file hệ thống S3A
+        #     sc = spark.sparkContext
+        #     Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
+        #     FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
+        #     conf = sc._jsc.hadoopConfiguration()
+        #     fs = FileSystem.get(Path(f"s3a://{MINIO_BUCKET}/").toUri(), conf)
+
+        #     if fs.exists(Path(f"s3a://{MINIO_BUCKET}/")):
+        #         print(f"=> Kết nối S3A tới bucket '{MINIO_BUCKET}' THÀNH CÔNG.")
+        # except Exception as e:
+        #     print(f"!!! LỖI KẾT NỐI: {str(e)}")
+
         return spark
 

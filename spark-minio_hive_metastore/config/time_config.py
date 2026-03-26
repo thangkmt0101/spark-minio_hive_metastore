@@ -280,7 +280,7 @@ class TimeService:
 
 
 # #Test code (comment out khi không dùng)
-info = TimeService.get_utc_range_from_vn_date('2026-01-08')
+info = TimeService.get_utc_range_from_vn_date('2026-03-10')
 
 y_day = info["day_ranges"]
 

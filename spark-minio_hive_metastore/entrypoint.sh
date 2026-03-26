@@ -5,11 +5,12 @@ set -e
 # Nếu không, mặc định là spark://spark-master:7077
 
 #SPARK_MASTER=${SPARK_MASTER:-"spark://10.8.75.82:7077"}
-SPARK_MASTER=${SPARK_MASTER:-"spark://spark-master:7077"}
+SPARK_MASTER=${SPARK_MASTER:-"spark://10.110.33.32:27077"}
 
 # Nếu có biến môi trường DEPLOY_MODE, sử dụng nó
 # Mặc định là client mode
 DEPLOY_MODE=${DEPLOY_MODE:-"client"}
+
 
 
 # Tìm đường dẫn spark-submit
@@ -51,6 +52,10 @@ SPARK_ARGS=(
   --num-executors "${NUM_EXECUTORS:-2}"
   --executor-cores "${EXECUTOR_CORES:-2}"  # Tăng từ 1 lên 2 để tận dụng parallelism (tối ưu cho 5-10GB)
   --executor-memory "${EXECUTOR_MEMORY:-1g}"  # Tăng từ 2g lên 4g để tránh spill to disk (tối ưu cho 5-10GB)
+  # Fail-fast để dừng sớm khi executor/task lỗi liên tục
+  --conf "spark.task.maxFailures=${SPARK_TASK_MAX_FAILURES:-1}"
+  --conf "spark.stage.maxConsecutiveAttempts=${SPARK_STAGE_MAX_ATTEMPTS:-1}"
+  --conf "spark.deploy.maxExecutorRetries=${SPARK_MAX_EXECUTOR_RETRIES:-8}"
 )
 
 # Thêm --jars nếu có JAR files (QUAN TRỌNG: Spark sẽ copy JAR từ driver đến executor)

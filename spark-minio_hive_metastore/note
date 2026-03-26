@@ -8,6 +8,17 @@ docker-compose exec spark-iceberg-etl /app/entrypoint.sh /app/jobs/main.py <job_
 
 docker-compose exec spark-iceberg-etl /app/entrypoint.sh /app/jobs/main.py 1 2026-01-01
 docker-compose exec spark-iceberg-etl /app/entrypoint.sh /app/jobs/main.py --job_type 1 --from_date 2026-01-01 --to_date 2026-01-11
+
+docker-compose exec spark-iceberg-etl /app/entrypoint.sh /app/jobs/main.py --job_type 1 --from_date 2026-01-01 --to_date 2026-01-11
+
+-- lệnh chạy trên linux
+docker exec etl-mart-to-gold /app/entrypoint.sh /app/jobs/main.py --job_type 1 --from_date 2026-03-23 --to_date 2026-03-23
+
+-- chạy docker compose file linux
+docker compose -f docker-compose-etl-mart-prod.yml up -d
+docker compose -f docker-compose-etl-mart-prod.yml stop
+docker compose -f docker-compose-etl-mart-prod.yml down
+
 . Rebuild image với SQL Server JDBC driver:
 docker-compose build spark-iceberg-etl
 Hoặc:
@@ -17,3 +28,30 @@ docker-compose stop spark-iceberg-etl
 docker-compose up -d spark-iceberg-etl
 
 
+Build image:
+- Build image
+docker build -t spark-iceberg-etl:v0.0.1 .
+docker tag spark-iceberg-etl:v0.0.1 k135520214055/spark-iceberg-etl:v0.0.1
+
+- Lưu image vào file tar
+docker save -o "D:\DBA\backup\script\spark-minio_hive_metastore\spark-minio_hive_metastore_image_v1.tar" k135520214055/spark-iceberg-etl:v0.0.1
+- Load image từ file tar
+docker load -i spark-minio_hive_metastore_image1.tar
+
+- Build image lên server registry.etc.vn/csdl
+docker build -t registry.etc.vn/csdl/spark-iceberg-etl:v0.0.2 .
+docker push registry.etc.vn/csdl/spark-iceberg-etl:v0.0.2
+
+- Push image lên docker hub( k cần)
+docker push k135520214055/spark-iceberg-etl:v0.0.0
+
+-- copy file .env vào container
+docker cp /u01/Services/etl_mart_to_gold/config.env etl-mart-to-gold:/app/config/.env
+/u01/Services/etl/spark-minio_hive_metastore/config
+
+-- kiêm tra trust
+docker exec etl-mart-to-gold keytool -list -keystore /opt/java/openjdk/lib/security/cacerts -storepass changeit -alias csdlgt-root-ca
+Warning: use -cacerts option to access cacerts keystore
+csdlgt-root-ca, Mar 23, 2026, trustedCertEntry,
+Certificate fingerprint (SHA-256): 04:4E:38:69:97:83:16:DE:73:65:3A:35:30:10:7A:F5:15:B3:D3:95:7F:68:C6:EC:FC:E4:15:1C:C0:46:37:F6
+[root@csdl-control01 etl]#

@@ -100,7 +100,8 @@ def main(job_type=None, input_date=None, from_date=None, to_date=None):
             except Exception as cleanup_error:
                 print(f"[WARNING] Lỗi khi cleanup Spark resources: {cleanup_error}")
 
-# Chạy job
+# Chạy job v1111
+# docker exec spark-iceberg-etl /app/entrypoint.sh /app/jobs/main.py --job_type 1 --from_date 2026-03-23 --to_date 2026-03-23
 if __name__ == "__main__":
     main()
 

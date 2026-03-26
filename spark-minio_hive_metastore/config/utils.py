@@ -180,7 +180,8 @@ class EtlUtils:
                 "mc", "alias", "set", "myminio",
                 minio_endpoint,
                 minio_access_key,
-                minio_secret_key
+                minio_secret_key,
+                "--insecure"
             ]
             
             result = subprocess.run(
@@ -196,7 +197,7 @@ class EtlUtils:
             
             # List các part files trong thư mục
             print(f"Listing files in: myminio/{minio_source}")
-            list_cmd = ["mc", "ls", f"myminio/{minio_source}/"]
+            list_cmd = ["mc", "--insecure", "ls", f"myminio/{minio_source}/"]
             
             result = subprocess.run(
                 list_cmd,
@@ -258,7 +259,7 @@ class EtlUtils:
                     if date_folders:
                         latest_date = sorted(date_folders)[-1]
                         print(f"[DEBUG] Thử list trong thư mục: {latest_date}")
-                        sub_list_cmd = ["mc", "ls", f"myminio/{minio_source}/{latest_date}/"]
+                        sub_list_cmd = ["mc","--insecure", "ls", f"myminio/{minio_source}/{latest_date}/"]
                         sub_result = subprocess.run(
                             sub_list_cmd,
                             capture_output=True,
@@ -304,7 +305,7 @@ class EtlUtils:
                     print(f"  Đang xử lý: {part_file}")
                     
                     # Download file từ MinIO
-                    cat_cmd = ["mc", "cat", part_path]
+                    cat_cmd = ["mc", "--insecure", "cat", part_path]
                     cat_result = subprocess.run(
                         cat_cmd,
                         capture_output=True,
@@ -321,7 +322,7 @@ class EtlUtils:
             # Upload file đã gộp lên MinIO với tên mới
             print(f"Đang upload file đã gộp lên MinIO: {final_filename}")
             cp_cmd = [
-                "mc", "cp",
+                "mc", "--insecure", "cp",
                 temp_merged_file,
                 f"myminio/{minio_source}/{final_filename}"
             ]
@@ -342,7 +343,7 @@ class EtlUtils:
             # Xóa các part files cũ (optional - có thể giữ lại để backup)
             print(f"Đang xóa các part files cũ...")
             for part_file in part_files:
-                rm_cmd = ["mc", "rm", f"myminio/{minio_source}/{part_file}"]
+                rm_cmd = ["mc", "--insecure", "rm", f"myminio/{minio_source}/{part_file}"]
                 rm_result = subprocess.run(
                     rm_cmd,
                     capture_output=True,
@@ -445,7 +446,8 @@ class EtlUtils:
                 "mc", "alias", "set", "myminio",
                 minio_endpoint,
                 minio_access_key,
-                minio_secret_key
+                minio_secret_key,
+                "--insecure"
             ]
             
             result = subprocess.run(
@@ -463,7 +465,7 @@ class EtlUtils:
             
             # Kiểm tra kết nối MinIO
             print("Checking MinIO connection...")
-            info_cmd = ["mc", "admin", "info", "myminio"]
+            info_cmd = ["mc", "--insecure", "admin", "info", "myminio"]
             result = subprocess.run(
                 info_cmd,
                 capture_output=True,
@@ -487,7 +489,7 @@ class EtlUtils:
             print(f"Destination: {dest_path}")
             
             mirror_cmd = [
-                "mc", "mirror",
+                "mc", "--insecure", "mirror",
                 "--overwrite",  # Ghi đè files đã tồn tại
                 "--quiet",      # Giảm output để tránh buffer overflow
                 f"myminio/{minio_source}",
@@ -516,6 +518,31 @@ class EtlUtils:
                     print(f"[ERROR] Failed to sync from MinIO: {result.stderr}")
                     print(f"Command output: {result.stdout}")
                     return False
+
+                # Gán quyền 777 cho thư mục đích và toàn bộ file/thư mục con
+                try:
+                    os.chmod(dest_path, 0o777)
+                    for root, dirs, files in os.walk(dest_path):
+                        for dir_name in dirs:
+                            os.chmod(os.path.join(root, dir_name), 0o777)
+                        for file_name in files:
+                            os.chmod(os.path.join(root, file_name), 0o777)
+                    print(f"[SYNC] Đã gán quyền 777 cho folder và file trong: {dest_path}")
+                except Exception as chmod_error:
+                    print(f"[WARNING] Không thể gán quyền 777 hoàn toàn: {chmod_error}")
+
+                # Đổi tên file _SUCCESS thành finshed nếu tồn tại
+                success_file = os.path.join(dest_path, "_SUCCESS")
+                finished_file = os.path.join(dest_path, "finshed")
+                if os.path.exists(success_file):
+                    try:
+                        if os.path.exists(finished_file):
+                            os.remove(finished_file)
+                        os.rename(success_file, finished_file)
+                        os.chmod(finished_file, 0o777)
+                        print(f"[SYNC] Đã đổi tên _SUCCESS thành finshed tại: {dest_path}")
+                    except Exception as rename_error:
+                        print(f"[WARNING] Không thể đổi tên _SUCCESS thành finshed: {rename_error}")
 
                 print(f"Sync completed successfully! dest_path: {dest_path}")
                 if input_date:
@@ -604,7 +631,8 @@ class EtlUtils:
                 "mc", "alias", "set", "myminio",
                 minio_endpoint,
                 minio_access_key,
-                minio_secret_key
+                minio_secret_key,
+                "--insecure"
             ]
             
             result = subprocess.run(
@@ -620,7 +648,7 @@ class EtlUtils:
             
             # List tất cả các thư mục ngày trong thư mục table
             print(f"Đang list các thư mục ngày trong: myminio/{minio_table_path}")
-            list_cmd = ["mc", "ls", f"myminio/{minio_table_path}/"]
+            list_cmd = ["mc", "--insecure", "ls", f"myminio/{minio_table_path}/"]
             
             list_result = subprocess.run(
                 list_cmd,
@@ -681,7 +709,7 @@ class EtlUtils:
                 print(f"Đang xóa: {folder_path}")
                 
                 rm_cmd = [
-                    "mc", "rm",
+                    "mc", "--insecure", "rm",
                     "--recursive",
                     "--force",
                     f"myminio/{folder_path}"

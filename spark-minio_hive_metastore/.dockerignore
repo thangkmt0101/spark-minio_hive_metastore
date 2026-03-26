@@ -33,6 +33,10 @@ sql/
 # Code folders - không đóng gói vào image vì đã mount từ host để dễ chỉnh sửa
 jobs/
 config/
+!config/csdlgt-root-ca.crt
+
+# entrypoint - mount từ host (docker-compose)
+entrypoint.sh
 
 # Git
 .git/
