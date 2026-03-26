@@ -1,0 +1,93 @@
+[
+  {
+    "created_at": "2026-03-25T13:29:49.121618",
+    "username": "admin",
+    "action": "auth.login",
+    "status": "success",
+    "detail": "Đăng nhập thành công"
+  },
+  {
+    "created_at": "2026-03-25T13:39:32.015134",
+    "username": "admin",
+    "action": "users.create",
+    "status": "success",
+    "detail": "Tạo user: thangnd"
+  },
+  {
+    "created_at": "2026-03-25T16:33:50.932404",
+    "username": "admin",
+    "action": "etl_table_migrate_brand.create",
+    "status": "success",
+    "detail": "Tạo id=1"
+  },
+  {
+    "created_at": "2026-03-25T16:36:54.079908",
+    "username": "admin",
+    "action": "etl_table_migrate_brand.create",
+    "status": "success",
+    "detail": "Tạo id=2"
+  },
+  {
+    "created_at": "2026-03-25T16:37:39.992788",
+    "username": "admin",
+    "action": "etl_table_migrate_brand.create",
+    "status": "success",
+    "detail": "Tạo id=3"
+  },
+  {
+    "created_at": "2026-03-25T16:38:06.311294",
+    "username": "admin",
+    "action": "etl_table_migrate_brand.create",
+    "status": "success",
+    "detail": "Tạo id=4"
+  },
+  {
+    "created_at": "2026-03-25T16:38:33.074819",
+    "username": "admin",
+    "action": "etl_table_migrate_brand.create",
+    "status": "success",
+    "detail": "Tạo id=5"
+  },
+  {
+    "created_at": "2026-03-25T16:38:52.376758",
+    "username": "admin",
+    "action": "etl_table_migrate_brand.create",
+    "status": "success",
+    "detail": "Tạo id=6"
+  },
+  {
+    "created_at": "2026-03-25T16:39:12.226578",
+    "username": "admin",
+    "action": "etl_table_migrate_brand.create",
+    "status": "success",
+    "detail": "Tạo id=7"
+  },
+  {
+    "created_at": "2026-03-25T16:39:34.161370",
+    "username": "admin",
+    "action": "etl_table_migrate_brand.create",
+    "status": "success",
+    "detail": "Tạo id=8"
+  },
+  {
+    "created_at": "2026-03-25T16:40:00.085265",
+    "username": "admin",
+    "action": "etl_table_migrate_brand.create",
+    "status": "success",
+    "detail": "Tạo id=9"
+  },
+  {
+    "created_at": "2026-03-25T17:05:55.553590",
+    "username": "admin",
+    "action": "etl_table_migrate_brand.update",
+    "status": "success",
+    "detail": "Cập nhật id=9"
+  },
+  {
+    "created_at": "2026-03-25T17:06:00.151089",
+    "username": "admin",
+    "action": "etl_table_migrate_brand.update",
+    "status": "success",
+    "detail": "Cập nhật id=8"
+  }
+]

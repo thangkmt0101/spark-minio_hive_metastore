@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lịch sử ETL Job</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container app-layout">
+        <header class="side-menu">
+            <h1><i class="fas fa-table-list"></i> Lịch sử ETL Job</h1>
+            <div class="header-actions">
+                <span id="authUserInfo" class="auth-user-info" style="display:none;"></span>
+                <button id="btnBackDashboard" class="btn btn-primary">
+                    <i class="fas fa-arrow-left"></i> Về Dashboard
+                </button>
+                <button id="btnDeleteLogsByDate" class="btn btn-warning" style="display:none;">
+                    <i class="fas fa-trash-can"></i> Xóa log theo ngày
+                </button>
+            </div>
+        </header>
+
+        <main class="content-area">
+            <div class="search-filter-section">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input id="tableSearchInput" type="text" placeholder="Tìm kiếm theo tên bảng..." autocomplete="off">
+                    <button id="btnClearTableSearch" class="clear-search" style="display:none;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <select id="pageSizeSelect" class="page-size-select">
+                    <option value="20">20 / trang</option>
+                    <option value="50" selected>50 / trang</option>
+                    <option value="100">100 / trang</option>
+                </select>
+                <button id="btnRefreshLogs" class="btn btn-secondary">
+                    <i class="fas fa-rotate"></i> Làm mới
+                </button>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Thời gian</th>
+                            <th>Job</th>
+                            <th>Bảng</th>
+                            <th>Loại thao tác</th>
+                            <th>Mức lỗi</th>
+                            <th>Thông điệp</th>
+                            <th>Rows inserted</th>
+                            <th>Exec ms</th>
+                            <th>By</th>
+                        </tr>
+                    </thead>
+                    <tbody id="etlJobLogPageBody">
+                        <tr><td colspan="10" class="loading">Đang tải...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination-bar">
+                <button id="btnPrevPage" class="btn btn-secondary btn-sm" type="button">
+                    <i class="fas fa-chevron-left"></i> Trước
+                </button>
+                <span id="paginationInfo" class="pagination-info">Trang 1</span>
+                <button id="btnNextPage" class="btn btn-secondary btn-sm" type="button">
+                    Sau <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <div id="fullLogModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-file-lines"></i> Chi tiết log ETL Job</h2>
+                <span class="close" onclick="closeFullLogModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group full-width">
+                    <label><i class="fas fa-info-circle"></i> Tóm tắt</label>
+                    <div id="fullLogMeta" class="full-log-meta">-</div>
+                </div>
+                <div class="form-group full-width">
+                    <label><i class="fas fa-terminal"></i> Full log</label>
+                    <pre id="fullLogContent" class="full-log-content">-</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/etl_job_logs.js') }}"></script>
+</body>
+</html>

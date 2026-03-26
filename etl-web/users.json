@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "full_name": "Administrator",
+    "role": "admin",
+    "is_active": true,
+    "created_at": "2026-03-24T14:04:38.414229",
+    "updated_at": "2026-03-24T14:10:22.414798",
+    "password_hash": "scrypt:32768:8:1$auu256W9LbDUcsFs$e5f7bd5e5f4969ba475b8546eceb3b07af94ed2b86b9f73dbd8aea7cc35b0aebe2417463dc5672f3d6ff21a79ade2a354e33aa8d6cdbf3aa651a0987b9a2ee83"
+  },
+  {
+    "id": 2,
+    "username": "thangnd",
+    "password_hash": "scrypt:32768:8:1$Zq8q2ZmRBWecGzht$e5fc986ecd02cc36b2df6e629ca3adae03966a4e168a5e622452864b65cf75b4024b530fc7365a8dbf121312537176bf4762899b1fa93ccc1fa6a9f5557ba52d",
+    "full_name": "thangnd",
+    "role": "admin",
+    "is_active": true,
+    "created_at": "2026-03-25T13:39:31.925149",
+    "updated_at": "2026-03-25T13:39:31.925149"
+  }
+]

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETL NIFI - CRUD</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container app-layout">
+        <header class="side-menu">
+            <h1><i class="fas fa-table"></i> ETL NIFI (CRUD)</h1>
+            <div class="header-actions">
+                <button id="btnBackDashboard" class="btn btn-primary">
+                    <i class="fas fa-arrow-left"></i> Về Dashboard
+                </button>
+            </div>
+        </header>
+
+        <main class="content-area">
+            <div class="table-container" style="margin-bottom: 16px;">
+                <div class="modal-actions" style="position: static; margin: 0; padding: 14px 20px; border-top: none;">
+                    <button class="btn btn-success" id="btnAddBrand" type="button">
+                        <i class="fas fa-plus"></i> Thêm mới
+                    </button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Process Group</th>
+                            <th>Process ID</th>
+                            <th>Process Name</th>
+                            <th>Status</th>
+                            <th>Updated At</th>
+                            <th>Record Count</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="brandTableBody">
+                        <tr><td colspan="8" class="loading">Đang tải...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Brand Modal -->
+    <div id="brandModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="brandModalTitle"><i class="fas fa-pen"></i> Thêm / Sửa ETL NIFI</h2>
+                <span class="close" onclick="closeBrandModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="brandForm">
+                    <input type="hidden" id="brandId">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="processGroupId">Process Group ID</label>
+                            <input type="text" id="processGroupId" maxlength="200">
+                        </div>
+                        <div class="form-group">
+                            <label for="processGroupName">Process Group Name</label>
+                            <input type="text" id="processGroupName" maxlength="200">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="processId">Process ID</label>
+                            <input type="text" id="processId" maxlength="200">
+                        </div>
+                        <div class="form-group">
+                            <label for="processName">Process Name</label>
+                            <input type="text" id="processName" maxlength="200">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="status">Status</label>
+                            <input type="number" id="status" step="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="updatedAt">Updated At</label>
+                            <input type="date" id="updatedAt">
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label for="recordCount">Record Count</label>
+                            <input type="number" id="recordCount" step="1">
+                        </div>
+                    </div>
+                    <div class="modal-actions" style="position: static;">
+                        <button type="button" class="btn btn-secondary" onclick="closeBrandModal()">
+                            <i class="fas fa-times"></i> Hủy
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="btnSaveBrand">
+                            <i class="fas fa-save"></i> Lưu
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/etl_table_migrate_brand.js') }}"></script>
+</body>
+</html>
+

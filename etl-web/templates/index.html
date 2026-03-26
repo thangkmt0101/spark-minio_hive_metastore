@@ -6,25 +6,46 @@
     <title>Quản lý ETL Jobs</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
 </head>
 <body>
-    <div class="container">
-        <header>
+    <div class="container app-layout">
+        <header class="side-menu">
             <h1><i class="fas fa-database"></i> Quản lý ETL Jobs</h1>
             <div class="header-actions">
-                <button id="btnExport" class="btn btn-warning">
-                    <i class="fas fa-file-csv"></i> Export CSV
+                <span id="authUserInfo" class="auth-user-info" style="display:none;"></span>
+                <button id="btnUserManage" class="btn btn-secondary" style="display:none;">
+                    <i class="fas fa-users-cog"></i> Quản lý User
                 </button>
-                <button id="btnImport" class="btn btn-success">
-                    <i class="fas fa-file-excel"></i> Import Excel
+                <button id="btnAuditLogs" class="btn btn-secondary" style="display:none;">
+                    <i class="fas fa-clock-rotate-left"></i> Lịch sử thao tác
+                </button>
+                <button id="btnEtlJobLogs" class="btn btn-secondary" style="display:none;">
+                    <i class="fas fa-table-list"></i> Lịch sử ETL Job
+                </button>
+                <button id="btnEtlTableMigrateBrandPage" class="btn btn-secondary">
+                    <i class="fas fa-table"></i> ETL NIFI
+                </button>
+                <button id="btnDataActions" class="btn btn-warning" style="display:none;">
+                    <i class="fas fa-folder-open"></i> Import/Export
+                </button>
+                <button id="btnConnection" class="btn btn-secondary">
+                    <i class="fas fa-plug"></i> Sửa Connection
                 </button>
                 <button id="btnAdd" class="btn btn-primary">
                     <i class="fas fa-plus"></i> Thêm Job Mới
                 </button>
+                <button id="btnLogin" class="btn btn-primary">
+                    <i class="fas fa-right-to-bracket"></i> Đăng nhập
+                </button>
+                <button id="btnLogout" class="btn btn-danger" style="display:none;">
+                    <i class="fas fa-right-from-bracket"></i> Đăng xuất
+                </button>
             </div>
         </header>
 
-        <main>
+        <main class="content-area">
             <!-- Form nhập liệu -->
             <div id="formModal" class="modal">
                 <div class="modal-content">
@@ -36,7 +57,7 @@
                         <input type="hidden" id="jobId">
                         
                         <div class="form-grid">
-                            <div class="form-group">
+                            <div class="form-group" id="group-jobType">
                                 <label for="jobType">
                                     <i class="fas fa-briefcase"></i> Loại Job <span class="required">*</span>
                                 </label>
@@ -50,35 +71,50 @@
                                 </select>
                             </div>
 
-                            <div class="form-group">
+                            <div class="form-group" id="group-schemaName">
                                 <label for="schemaName">
                                     <i class="fas fa-layer-group"></i> Tên Schema <span class="required">*</span>
                                 </label>
                                 <input type="text" id="schemaName" name="schema_name" required maxlength="50">
                             </div>
 
-                            <div class="form-group">
+                            <div class="form-group" id="group-tableName">
                                 <label for="tableName">
                                     <i class="fas fa-table"></i> Tên Bảng <span class="required">*</span>
                                 </label>
                                 <input type="text" id="tableName" name="table_name" required maxlength="200">
                             </div>
 
-                            <div class="form-group full-width">
+                            <div class="form-group full-width" id="group-sqlPath">
                                 <label for="sqlPath">
                                     <i class="fas fa-file-code"></i> Đường dẫn SQL
                                 </label>
                                 <textarea id="sqlPath" name="sql_path" rows="2" maxlength="500" placeholder="/path/to/sql/file.sql"></textarea>
+                                <div class="field-helper-row">
+                                    <small class="field-helper">
+                                        Nhập dạng <code>sql/...</code> để tự map đến thư mục <code>/app/sql</code>.
+                                    </small>
+                                    <button type="button" class="btn btn-warning btn-sm" id="btnLoadSql">
+                                        <i class="fas fa-sync-alt"></i> Load SQL
+                                    </button>
+                                </div>
                             </div>
 
-                            <div class="form-group full-width">
+                            <div class="form-group full-width" id="group-sqlCommand">
+                                <label for="sqlCommand">
+                                    <i class="fas fa-terminal"></i> Nội dung SQL (đọc từ Đường dẫn SQL)
+                                </label>
+                                <textarea id="sqlCommand" name="sql_command" rows="6" maxlength="20000" placeholder="Nội dung SQL sẽ được load từ file..."></textarea>
+                            </div>
+
+                            <div class="form-group full-width" id="group-description">
                                 <label for="description">
                                     <i class="fas fa-align-left"></i> Mô tả
                                 </label>
                                 <textarea id="description" name="description" rows="3" maxlength="500"></textarea>
                             </div>
 
-                            <div class="form-group">
+                            <div class="form-group" id="group-isActive">
                                 <label class="checkbox-label">
                                     <input type="checkbox" id="isActive" name="is_active" checked>
                                     <span><i class="fas fa-check-circle"></i> Kích hoạt</span>
@@ -124,6 +160,18 @@
                         <i class="fas fa-calendar-check"></i> Year
                     </button>
                 </div>
+                <div class="job-type-note">
+                    <small><strong>Lưu ý:</strong> job_type = 1 --> Daily, 2 --> Week, 3 --> Month, 4 --> Quarter, 5 --> Year</small>
+                </div>
+
+                <div class="report-type-filter">
+                    <label for="reportTypeFilter">
+                        <i class="fas fa-folder-open"></i> Lọc theo loại báo cáo:
+                    </label>
+                    <select id="reportTypeFilter">
+                        <option value="all">Tất cả</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Search and Status Filter Section -->
@@ -133,7 +181,7 @@
                     <input 
                         type="text" 
                         id="searchInput" 
-                        placeholder="Tìm kiếm theo tên bảng..."
+                        placeholder="Tìm theo tên bảng hoặc file SQL (vd: abc / abc.sql)..."
                         autocomplete="off"
                     >
                     <button id="clearSearch" class="clear-search" style="display: none;">
@@ -160,10 +208,10 @@
                         <tr>
                             <th>ID</th>
                             <th>Loại Job</th>
-                            <th>Schema</th>
+                                <th>Loại báo cáo</th>
                             <th>Bảng</th>
                             <th>SQL Path</th>
-                            <th>Mô tả</th>
+                            <th>Nội dung SQL</th>
                             <th>Trạng thái</th>
                             <th>Thao tác</th>
                         </tr>
@@ -177,7 +225,199 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination -->
+            <div class="pagination-bar" id="paginationBar">
+                <button class="btn btn-secondary btn-sm" id="btnPrevPage" type="button">
+                    <i class="fas fa-chevron-left"></i> Trước
+                </button>
+                <span class="pagination-info" id="paginationInfo">Trang 1</span>
+                <button class="btn btn-secondary btn-sm" id="btnNextPage" type="button">
+                    Sau <i class="fas fa-chevron-right"></i>
+                </button>
+                <select id="pageSizeSelect" class="page-size-select">
+                    <option value="10">10 / trang</option>
+                    <option value="20">20 / trang</option>
+                    <option value="50">50 / trang</option>
+                </select>
+            </div>
         </main>
+    </div>
+
+    <!-- SQL Edit Modal -->
+    <div id="sqlEditModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-terminal"></i> Sửa Nội dung SQL</h2>
+                <div class="sql-edit-header-actions">
+                    <button type="button" class="btn btn-secondary" id="btnFormatSqlEdit">
+                        <i class="fas fa-magic"></i> Định dạng SQL
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="closeSqlEditModal()">
+                        <i class="fas fa-times"></i> Hủy
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="btnSaveSqlEdit" form="sqlEditForm">
+                        <i class="fas fa-save"></i> Lưu
+                    </button>
+                </div>
+                <span class="close" onclick="closeSqlEditModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="sqlEditForm">
+                    <input type="hidden" id="sqlEditSqlPath">
+                    <div class="form-group full-width">
+                        <label for="sqlEditContent">
+                            <i class="fas fa-file-code"></i> Nội dung SQL
+                        </label>
+                        <textarea id="sqlEditContent" rows="14" maxlength="20000"></textarea>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Modal -->
+    <div id="connectionModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2><i class="fas fa-plug"></i> Sửa Connection Database</h2>
+                <span class="close" onclick="closeConnectionModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="connectionForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="connHost"><i class="fas fa-server"></i> Host <span class="required">*</span></label>
+                            <input type="text" id="connHost" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="connPort"><i class="fas fa-network-wired"></i> Port <span class="required">*</span></label>
+                            <input type="number" id="connPort" required min="1" max="65535">
+                        </div>
+                        <div class="form-group">
+                            <label for="connDatabase"><i class="fas fa-database"></i> Database <span class="required">*</span></label>
+                            <input type="text" id="connDatabase" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="connUser"><i class="fas fa-user"></i> Username <span class="required">*</span></label>
+                            <input type="text" id="connUser" required>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="connPassword"><i class="fas fa-key"></i> Password <span class="required">*</span></label>
+                            <input type="password" id="connPassword" required>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeConnectionModal()">
+                            <i class="fas fa-times"></i> Hủy
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="btnSaveConnection">
+                            <i class="fas fa-save"></i> Lưu Connection
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2><i class="fas fa-right-to-bracket"></i> Đăng nhập</h2>
+                <span class="close" onclick="closeLoginModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="loginForm">
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label for="loginUsername"><i class="fas fa-user"></i> Username <span class="required">*</span></label>
+                            <input type="text" id="loginUsername" required>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="loginPassword"><i class="fas fa-key"></i> Password <span class="required">*</span></label>
+                            <input type="password" id="loginPassword" required>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeLoginModal()">
+                            <i class="fas fa-times"></i> Hủy
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-right-to-bracket"></i> Đăng nhập
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Management Modal -->
+    <div id="userModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-users-cog"></i> Quản lý User</h2>
+                <span class="close" onclick="closeUserModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="userId">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="userUsername">Username <span class="required">*</span></label>
+                            <input type="text" id="userUsername" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="userFullName">Họ tên</label>
+                            <input type="text" id="userFullName">
+                        </div>
+                        <div class="form-group">
+                            <label for="userPassword">Mật khẩu <span id="userPasswordRequired" class="required">*</span></label>
+                            <input type="password" id="userPassword" placeholder="Để trống nếu không đổi khi sửa">
+                        </div>
+                        <div class="form-group">
+                            <label for="userRole">Role <span class="required">*</span></label>
+                            <select id="userRole" required>
+                                <option value="user">user</option>
+                                <option value="admin">admin</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="userIsActive" checked>
+                                <span>Kích hoạt</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="resetUserForm()">
+                            <i class="fas fa-eraser"></i> Làm mới
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Lưu User
+                        </button>
+                    </div>
+                </form>
+
+                <div class="table-container" style="margin-top: 16px;">
+                    <table id="userTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Họ tên</th>
+                                <th>Role</th>
+                                <th>Trạng thái</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTableBody">
+                            <tr><td colspan="6" class="loading">Đang tải...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- SQL Path Modal -->
@@ -297,6 +537,102 @@
         </div>
     </div>
 
+    <!-- Data Action Modal -->
+    <div id="dataActionModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2><i class="fas fa-folder-open"></i> Import / Export</h2>
+                <span class="close" onclick="closeDataActionModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="modal-actions">
+                    <button class="btn btn-warning" id="btnExportFromMenu">
+                        <i class="fas fa-file-csv"></i> Export CSV
+                    </button>
+                    <button class="btn btn-success" id="btnImportFromMenu">
+                        <i class="fas fa-file-excel"></i> Import Excel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Log Modal -->
+    <div id="auditModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-clock-rotate-left"></i> Lịch sử thao tác người dùng</h2>
+                <span class="close" onclick="closeAuditModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="modal-actions" style="padding-top: 0; justify-content: flex-start;">
+                    <button id="btnDeleteAuditLogs" class="btn btn-danger btn-sm" title="Xóa dữ liệu lịch sử">
+                        <i class="fas fa-trash"></i> Xóa lịch sử
+                    </button>
+                </div>
+                <div class="table-container" style="max-height: 450px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Thời gian</th>
+                                <th>User</th>
+                                <th>Hành động</th>
+                                <th>Kết quả</th>
+                                <th>Chi tiết</th>
+                            </tr>
+                        </thead>
+                        <tbody id="auditTableBody">
+                            <tr><td colspan="5" class="loading">Đang tải...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeAuditModal()">
+                        <i class="fas fa-times"></i> Đóng
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ETL Job Log Modal -->
+    <div id="etlJobLogModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-table-list"></i> Lịch sử ETL Job</h2>
+                <span class="close" onclick="closeEtlJobLogModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="table-container" style="max-height: 480px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Thời gian</th>
+                                <th>Job</th>
+                                <th>Bảng</th>
+                                <th>Loại thao tác</th>
+                                <th>Mức lỗi</th>
+                                <th>Thông điệp</th>
+                                <th>Rows inserted</th>
+                                <th>Exec ms</th>
+                                <th>By</th>
+                            </tr>
+                        </thead>
+                        <tbody id="etlJobLogTableBody">
+                            <tr><td colspan="10" class="loading">Đang tải...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeEtlJobLogModal()">
+                        <i class="fas fa-times"></i> Đóng
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Preview Data Modal -->
     <div id="previewModal" class="modal">
         <div class="modal-content modal-large">
@@ -341,6 +677,9 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql-formatter/15.6.9/sql-formatter.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
